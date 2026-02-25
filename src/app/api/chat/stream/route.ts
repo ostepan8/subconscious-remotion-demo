@@ -124,7 +124,7 @@ ${recentHistory}
 ## Current User Message
 ${message}`;
 
-        const tools = buildTools(convexSiteUrl, projectId, toolSecret);
+        const tools = buildTools(convexSiteUrl, internalId, toolSecret);
 
         const stream = client.stream({
           engine: SUBCONSCIOUS_ENGINE,
