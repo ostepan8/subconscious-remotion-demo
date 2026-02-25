@@ -47,6 +47,7 @@ useCurrentFrame(), useVideoConfig(), interpolate(value, inputRange, outputRange,
 ### Animation helpers (in scope — delays are FRAME integers, fps=30)
 fadeInBlur(frame, delay, dur?), fadeInUp(frame, delay, distance?, dur?), scaleIn(frame, delay, dur?), slideFromLeft(frame, delay, distance?, dur?), slideFromRight(frame, delay, distance?, dur?), glowPulse(frame, delay, color), revealLine(frame, delay, dur?), counterSpinUp(frame, delay, target, dur?), floatY(frame, amplitude?, speed?, phase?), breathe(frame, speed?, amount?, phase?)
 - staggerEntrance(frame, index, baseDelay, spacing?) — auto-picks a different animation per index
+- counterSpinUp returns a RAW FLOAT — you MUST format it: Math.round(counterSpinUp(frame, delay, 4300)) or counterSpinUp(frame, delay, 99.9).toFixed(1)
 
 ### Background helpers — RETURN CSSProperties OBJECTS, use with spread syntax
 - animatedMeshBg(frame, theme) → style object with animated radial gradients. Use: React.createElement('div', { style: animatedMeshBg(frame, theme) })
@@ -104,7 +105,9 @@ const SUBAGENT_SYSTEM_PROMPT = `You are a Remotion scene builder creating produc
 - Use glassSurface/glassCard for panels, depthShadow() for depth
 - Use gradientText or themedHeadlineStyle for headlines
 - Large, readable typography: heroTitle for main text, sectionTitle for section headers
-- Animate numbers with counterSpinUp, text with typewriterReveal
+- Animate numbers with counterSpinUp — ALWAYS wrap with Math.round() or .toFixed(). Example: Math.round(counterSpinUp(frame, 10, 4300)) displays "4300", not "4299.588692657". For percentages use .toFixed(1). Never show raw floats.
+- Format large numbers with toLocaleString() after rounding for commas (e.g. "12,000+")
+- Animate text with typewriterReveal
 
 ## Architecture Pattern
 \`\`\`
@@ -426,6 +429,7 @@ ${COMPONENT_API_REF}
 - NO imports, NO exports — everything is already in scope
 - depthShadow() returns a string — use as boxShadow: depthShadow(), don't spread it
 - getTypography(theme) returns the style objects directly
+- counterSpinUp() returns a raw float — ALWAYS wrap: Math.round(counterSpinUp(...)) or .toFixed(1). Never display unformatted floats.
 - Use React.createElement() for all elements (no JSX)
 - Use integer frame numbers for animation delays`;
 
