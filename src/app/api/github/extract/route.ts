@@ -752,19 +752,25 @@ export async function POST(req: NextRequest) {
           }
         }
 
-        // Step 7: Collect all images to import (deduplicated)
+        // Step 7: Collect all images to import (deduplicated by URL and name)
         const allImages = new Map<string, string>();
+        const usedNames = new Set<string>();
+
+        const addImage = (url: string, name: string) => {
+          if (allImages.has(url)) return;
+          if (usedNames.has(name.toLowerCase())) return;
+          allImages.set(url, name);
+          usedNames.add(name.toLowerCase());
+        };
 
         for (const img of repoImages) {
-          allImages.set(img.url, img.name);
+          addImage(img.url, img.name);
         }
         for (const img of parsed.imageUrls) {
-          if (!allImages.has(img.url)) {
-            allImages.set(img.url, img.name);
-          }
+          addImage(img.url, img.name);
         }
-        if (ogImage && !allImages.has(ogImage)) {
-          allImages.set(ogImage, "OG Image");
+        if (ogImage) {
+          addImage(ogImage, "OG Image");
         }
 
         const imageList = Array.from(allImages.entries()).map(

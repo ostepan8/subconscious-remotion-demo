@@ -33,8 +33,17 @@ All take frame (number) as first arg and delay (number, in FRAMES not seconds) a
 - glowPulse(frame, delay, color) → { opacity, boxShadow }
 - revealLine(frame, delay, dur?) → { width: "X%" }
 - animatedNumber(frame, delay, targetStr, dur?) → string
-- typewriterReveal(frame, delay, totalChars, dur?) → { visibleChars, showCursor }
-- counterSpinUp(frame, delay, target, dur?) → number
+- typewriterReveal(frame, delay, totalChars, dur?) → { visibleChars: number, showCursor: boolean }
+  Returns an OBJECT, NOT a string. You MUST slice your text with visibleChars and render showCursor separately.
+  CORRECT usage:
+    const text = "Hello world";
+    const tw = typewriterReveal(frame, 10, text.length, 30);
+    const revealed = text.slice(0, tw.visibleChars) + (tw.showCursor ? "|" : "");
+    // Then render: React.createElement('span', null, revealed)
+  WRONG: React.createElement('span', null, typewriterReveal(frame, 10, text.length))
+    ← This renders an OBJECT as a React child and CRASHES with "Objects are not valid as a React child"
+  WRONG: typewriterReveal(frame, 10, myString) ← third arg is totalChars (number), NOT the string itself
+- counterSpinUp(frame, delay, target, dur?) → number (raw float — always wrap: Math.round() or .toFixed())
 - horizontalWipe(frame, delay, dur?, direction?) → { clipPath }
 - parallaxLayer(frame, speed?, direction?) → { transform }
 - fadeOutDown(frame, startFrame, dur?, distance?) → { opacity, transform }
@@ -108,4 +117,8 @@ content: { headline, subtext, buttonText, bullets, features, steps, stats, quest
 6. Always call useCurrentFrame() to get the frame variable.
 7. depthShadow() returns a STRING. Use it as: boxShadow: depthShadow() — never spread it.
 8. getTypography(theme) returns the typography object directly. Do NOT destructure it.
+9. typewriterReveal() returns an OBJECT { visibleChars, showCursor }, NOT a string.
+   Slice your text: myString.slice(0, tw.visibleChars). NEVER pass the return value directly as a React child.
+10. counterSpinUp() returns a raw float. Always format: Math.round(counterSpinUp(...)) or .toFixed(0).
+11. NEVER pass an object as a React child. Only strings and numbers are valid children.
 `;

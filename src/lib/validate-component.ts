@@ -82,6 +82,19 @@ function stripAndFix(code: string): string {
     "const typography = getTypography($1)",
   );
 
+  // Fix typewriterReveal used with a string arg instead of totalChars number.
+  // Pattern: typewriterReveal(frame, delay, someStringVar) where 3rd arg is not a number.
+  // We can't fully fix usage as a React child statically, but we add a warning via the
+  // validation step below. Here we fix the common "pass string instead of .length":
+  fixed = fixed.replace(
+    /typewriterReveal\((\w+),\s*(\w+),\s*(\w+)\s*\)/g,
+    (match, f, d, third) => {
+      if (/^\d+$/.test(third)) return match;
+      if (third.endsWith(".length")) return match;
+      return `typewriterReveal(${f}, ${d}, ${third}.length)`;
+    },
+  );
+
   return fixed;
 }
 
@@ -159,6 +172,25 @@ return typeof GeneratedComponent;`,
     return {
       valid: false,
       error: `Runtime check failed: ${msg}`,
+      fixedCode: fixed,
+    };
+  }
+
+  // Static check: typewriterReveal returns an object, not a string.
+  // If the code calls typewriterReveal but never accesses .visibleChars,
+  // it will crash at runtime with "Objects are not valid as a React child".
+  if (
+    fixed.includes("typewriterReveal(") &&
+    !fixed.includes(".visibleChars") &&
+    !fixed.includes("visibleChars")
+  ) {
+    return {
+      valid: false,
+      error:
+        "typewriterReveal() returns { visibleChars, showCursor }, NOT a string. " +
+        "You must use: const tw = typewriterReveal(frame, delay, text.length); " +
+        "then render text.slice(0, tw.visibleChars). " +
+        "Never pass the return value directly as a React child.",
       fixedCode: fixed,
     };
   }

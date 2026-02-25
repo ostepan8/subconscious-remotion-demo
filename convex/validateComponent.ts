@@ -117,6 +117,15 @@ function stripAndFix(code: string): string {
     "const typography = getTypography($1)",
   );
 
+  fixed = fixed.replace(
+    /typewriterReveal\((\w+),\s*(\w+),\s*(\w+)\s*\)/g,
+    (match, f, d, third) => {
+      if (/^\d+$/.test(third)) return match;
+      if (third.endsWith(".length")) return match;
+      return `typewriterReveal(${f}, ${d}, ${third}.length)`;
+    },
+  );
+
   return fixed;
 }
 
@@ -301,6 +310,22 @@ export function validateComponentCode(code: string): ValidationResult {
         `Only use functions listed in the API reference. Do NOT invent functions.`,
       fixedCode: fixed,
       undefinedRefs,
+    };
+  }
+
+  if (
+    fixed.includes("typewriterReveal(") &&
+    !fixed.includes(".visibleChars") &&
+    !fixed.includes("visibleChars")
+  ) {
+    return {
+      valid: false,
+      error:
+        "typewriterReveal() returns { visibleChars, showCursor }, NOT a string. " +
+        "You must use: const tw = typewriterReveal(frame, delay, text.length); " +
+        "then render text.slice(0, tw.visibleChars). " +
+        "Never pass the return value directly as a React child.",
+      fixedCode: fixed,
     };
   }
 
