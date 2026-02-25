@@ -15,9 +15,10 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "PromoClip — AI Video Creator",
+  title: "Subconscious Video Creator",
   description:
-    "Create stunning promotional videos for your website with AI-powered scene generation, themes, and voiceover.",
+    "Create stunning promotional videos for your product with AI-powered scene generation, themes, and voiceover.",
+  icons: { icon: "/favicon.svg" },
 };
 
 export default function RootLayout({

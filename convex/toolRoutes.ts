@@ -330,49 +330,6 @@ export const listMedia = httpAction(async (ctx, request) => {
   }
 });
 
-export const fetchGithubFile = httpAction(async (ctx, request) => {
-  try {
-    const body = await request.json();
-    const params = parseBody(body);
-    const path = String(params.path);
-
-    let owner = params.owner ? String(params.owner) : "";
-    let repo = params.repo ? String(params.repo) : "";
-    let branch = params.branch ? String(params.branch) : "main";
-
-    if (!owner && params.projectId) {
-      const project = await ctx.runQuery(api.projects.getProjectById, {
-        projectId: params.projectId as Id<"projects">,
-      });
-      if (project?.githubUrl) {
-        const m = project.githubUrl.match(/github\.com\/([^/]+)\/([^/\?#]+)/);
-        if (m) {
-          owner = m[1];
-          repo = m[2].replace(/\.git$/, "");
-        }
-      }
-    }
-
-    if (!owner || !repo) {
-      return errorJson("Could not determine repo. Provide owner/repo or projectId.");
-    }
-
-    const url = `https://raw.githubusercontent.com/${owner}/${repo}/${branch}/${path}`;
-    const res = await fetch(url, {
-      headers: { "User-Agent": "VideoCreator/1.0" },
-    });
-
-    if (!res.ok) {
-      return errorJson(`Could not fetch file: ${path}`, `HTTP ${res.status}`);
-    }
-
-    const content = await res.text();
-    return json({ content, path });
-  } catch (e) {
-    return errorJson("fetch_github_file failed", String(e));
-  }
-});
-
 export const saveComponent = httpAction(async (ctx, request) => {
   try {
     const body = await request.json();
@@ -683,11 +640,23 @@ export const saveGeneratedCode = httpAction(async (ctx, request) => {
 
     const validation = validateComponentCode(generatedCode);
     if (!validation.valid) {
+      await ctx.runMutation(api.scenes.updateScene, {
+        sceneId,
+        content: {
+          ...existingContent,
+          generationStatus: "error",
+          generationError: `Validation failed: ${validation.error}`,
+        },
+      });
       return json({
         success: false,
         error: validation.error,
+        undefinedRefs: validation.undefinedRefs,
         message:
-          "Your code did not compile. Fix the error and call save_generated_code again with corrected code.",
+          "Your code did not compile. The following error was found:\n\n" +
+          validation.error +
+          "\n\nFix the error and call save_generated_code again with corrected code. " +
+          "Only use functions listed in the AVAILABLE API. Do NOT invent functions.",
       });
     }
 
@@ -701,9 +670,262 @@ export const saveGeneratedCode = httpAction(async (ctx, request) => {
       },
     });
 
-    return json({ success: true, status: "ready" });
+    const result: Record<string, unknown> = {
+      success: true,
+      status: "ready",
+    };
+    if (validation.warnings && validation.warnings.length > 0) {
+      result.warnings = validation.warnings;
+    }
+    return json(result);
   } catch (e) {
     return errorJson("save_generated_code failed", String(e));
+  }
+});
+
+// ---------------------------------------------------------------------------
+// Progressive code buffer tools: write_code, edit_code, read_buffer, finalize
+// ---------------------------------------------------------------------------
+
+function bufferPreview(lines: string[], maxLines = 5): string {
+  if (lines.length <= maxLines * 2) {
+    return lines.map((l, i) => `${i + 1}| ${l}`).join("\n");
+  }
+  const top = lines.slice(0, maxLines).map((l, i) => `${i + 1}| ${l}`);
+  const bot = lines.slice(-maxLines).map((l, i) => `${lines.length - maxLines + i + 1}| ${l}`);
+  return [...top, `   ... (${lines.length - maxLines * 2} lines omitted) ...`, ...bot].join("\n");
+}
+
+export const writeCode = httpAction(async (ctx, request) => {
+  try {
+    const body = await request.json();
+    const params = parseBody(body);
+    const sceneId = params.sceneId as Id<"scenes">;
+    const code = params.code != null ? String(params.code) : "";
+    const startLine = params.startLine != null ? toNumber(params.startLine, -1) : -1;
+    const endLine = params.endLine != null ? toNumber(params.endLine, -1) : -1;
+
+    if (!sceneId) return errorJson("sceneId is required");
+
+    const scene = await ctx.runQuery(api.scenes.getScene, { sceneId });
+    if (!scene) return errorJson("Scene not found");
+
+    const existingContent = (scene.content as Record<string, unknown>) || {};
+    const currentBuffer = typeof existingContent.codeBuffer === "string"
+      ? existingContent.codeBuffer
+      : "";
+
+    const oldLines = currentBuffer ? currentBuffer.split("\n") : [];
+    const newLines = code.split("\n");
+    let lines: string[];
+
+    if (startLine < 0 && endLine < 0) {
+      lines = newLines;
+    } else {
+      lines = [...oldLines];
+      const s = Math.max(0, startLine < 0 ? 0 : Math.min(startLine, lines.length));
+      const e = endLine >= 0 ? Math.min(endLine, lines.length) : s;
+      lines.splice(s, Math.max(0, e - s), ...newLines);
+    }
+
+    const updatedBuffer = lines.join("\n");
+
+    await ctx.runMutation(api.scenes.updateScene, {
+      sceneId,
+      content: {
+        ...existingContent,
+        codeBuffer: updatedBuffer,
+        generationStatus: "generating",
+      },
+    });
+
+    return json({
+      success: true,
+      totalLines: lines.length,
+      totalChars: updatedBuffer.length,
+      preview: bufferPreview(lines),
+    });
+  } catch (e) {
+    return errorJson("write_code failed", String(e));
+  }
+});
+
+export const editCode = httpAction(async (ctx, request) => {
+  try {
+    const body = await request.json();
+    const params = parseBody(body);
+    const sceneId = params.sceneId as Id<"scenes">;
+    const oldString = params.oldString != null ? String(params.oldString) : "";
+    const newString = params.newString != null ? String(params.newString) : "";
+
+    if (!sceneId) return errorJson("sceneId is required");
+    if (!oldString) return errorJson("oldString is required");
+
+    const scene = await ctx.runQuery(api.scenes.getScene, { sceneId });
+    if (!scene) return errorJson("Scene not found");
+
+    const existingContent = (scene.content as Record<string, unknown>) || {};
+    const currentBuffer = typeof existingContent.codeBuffer === "string"
+      ? existingContent.codeBuffer
+      : "";
+
+    if (!currentBuffer) return errorJson("Code buffer is empty. Use write_code first.");
+
+    const idx = currentBuffer.indexOf(oldString);
+    if (idx === -1) {
+      const lines = currentBuffer.split("\n");
+      return json({
+        success: false,
+        error: "oldString not found in buffer. Make sure it matches exactly (including whitespace).",
+        totalLines: lines.length,
+        preview: bufferPreview(lines),
+      });
+    }
+
+    const updatedBuffer = currentBuffer.slice(0, idx) + newString + currentBuffer.slice(idx + oldString.length);
+    const lines = updatedBuffer.split("\n");
+    const matchLine = currentBuffer.slice(0, idx).split("\n").length;
+
+    await ctx.runMutation(api.scenes.updateScene, {
+      sceneId,
+      content: {
+        ...existingContent,
+        codeBuffer: updatedBuffer,
+        generationStatus: "generating",
+      },
+    });
+
+    return json({
+      success: true,
+      matchLine,
+      totalLines: lines.length,
+      totalChars: updatedBuffer.length,
+    });
+  } catch (e) {
+    return errorJson("edit_code failed", String(e));
+  }
+});
+
+export const readBuffer = httpAction(async (ctx, request) => {
+  try {
+    const body = await request.json();
+    const params = parseBody(body);
+    const sceneId = params.sceneId as Id<"scenes">;
+    const startLine = toNumber(params.startLine, 0);
+    const numLines = toNumber(params.numLines, 50);
+
+    if (!sceneId) return errorJson("sceneId is required");
+
+    const scene = await ctx.runQuery(api.scenes.getScene, { sceneId });
+    if (!scene) return errorJson("Scene not found");
+
+    const existingContent = (scene.content as Record<string, unknown>) || {};
+    const currentBuffer = typeof existingContent.codeBuffer === "string"
+      ? existingContent.codeBuffer
+      : "";
+
+    if (!currentBuffer) {
+      return json({
+        content: "",
+        startLine: 0,
+        endLine: 0,
+        totalLines: 0,
+        hasMore: false,
+        message: "Buffer is empty. Use write_code to start writing.",
+      });
+    }
+
+    const allLines = currentBuffer.split("\n");
+    const totalLines = allLines.length;
+    const clamped = Math.max(0, Math.min(startLine, totalLines));
+    const window = allLines.slice(clamped, clamped + numLines);
+    const endLine = clamped + window.length;
+
+    const numbered = window.map((l, i) => `${clamped + i + 1}| ${l}`).join("\n");
+
+    return json({
+      content: numbered,
+      startLine: clamped,
+      endLine,
+      totalLines,
+      hasMore: endLine < totalLines,
+    });
+  } catch (e) {
+    return errorJson("read_buffer failed", String(e));
+  }
+});
+
+// Backward-compat alias
+export const appendCode = writeCode;
+
+export const finalizeComponent = httpAction(async (ctx, request) => {
+  try {
+    const body = await request.json();
+    const params = parseBody(body);
+    const sceneId = params.sceneId as Id<"scenes">;
+
+    if (!sceneId) return errorJson("sceneId is required");
+
+    const scene = await ctx.runQuery(api.scenes.getScene, { sceneId });
+    if (!scene) return errorJson("Scene not found");
+
+    const existingContent = (scene.content as Record<string, unknown>) || {};
+    const buffer = typeof existingContent.codeBuffer === "string"
+      ? existingContent.codeBuffer
+      : "";
+
+    if (!buffer) {
+      return json({
+        success: false,
+        error: "Code buffer is empty. Use write_code to add code before finalizing.",
+      });
+    }
+
+    const validation = validateComponentCode(buffer);
+
+    if (!validation.valid) {
+      await ctx.runMutation(api.scenes.updateScene, {
+        sceneId,
+        content: {
+          ...existingContent,
+          generationStatus: "error",
+          generationError: `Validation failed: ${validation.error}`,
+        },
+      });
+      return json({
+        success: false,
+        error: validation.error,
+        undefinedRefs: validation.undefinedRefs,
+        bufferPreview: buffer.slice(0, 500),
+        message:
+          "Validation failed. Use edit_code to fix the issue, " +
+          "or write_code with startLine=0 endLine=<totalLines> " +
+          "to rewrite. Error: " + validation.error,
+      });
+    }
+
+    await ctx.runMutation(api.scenes.updateScene, {
+      sceneId,
+      content: {
+        ...existingContent,
+        generationStatus: "ready",
+        generatedCode: validation.fixedCode,
+        generationError: undefined,
+        codeBuffer: undefined,
+      },
+    });
+
+    const result: Record<string, unknown> = {
+      success: true,
+      status: "ready",
+      totalChars: validation.fixedCode.length,
+    };
+    if (validation.warnings && validation.warnings.length > 0) {
+      result.warnings = validation.warnings;
+    }
+    return json(result);
+  } catch (e) {
+    return errorJson("finalize_component failed", String(e));
   }
 });
 
@@ -743,7 +965,16 @@ const GITHUB_HEADERS = {
 };
 
 const REPO_SKIP_DIRS =
-  /^(node_modules|\.git|\.next|\.cache|dist|build|\.turbo|\.vercel|coverage)\//;
+  /^(node_modules|\.git|\.next|\.cache|dist|build|\.turbo|\.vercel|coverage|__pycache__|\.mypy_cache)\//;
+
+const DESIGN_FILE_PATTERNS = [
+  /globals?\.css$/i,
+  /tailwind\.config\./i,
+  /theme\./i,
+  /variables\.css$/i,
+  /colors?\./i,
+  /styles?\.(css|scss|less)$/i,
+];
 
 function parseGithubUrl(url: string): { owner: string; repo: string } | null {
   const m = url.match(/github\.com\/([^/]+)\/([^/\?#]+)/);
@@ -751,14 +982,63 @@ function parseGithubUrl(url: string): { owner: string; repo: string } | null {
   return { owner: m[1], repo: m[2].replace(/\.git$/, "") };
 }
 
-export const listRepoFiles = httpAction(async (ctx, request) => {
+async function resolveRepoBranch(
+  owner: string,
+  repo: string,
+): Promise<string> {
+  const metaRes = await fetch(
+    `https://api.github.com/repos/${owner}/${repo}`,
+    { headers: GITHUB_HEADERS },
+  );
+  if (!metaRes.ok) return "main";
+  const meta = (await metaRes.json()) as { default_branch?: string };
+  return meta?.default_branch || "main";
+}
+
+async function getRepoTree(
+  owner: string,
+  repo: string,
+  branch: string,
+): Promise<string[]> {
+  const treeRes = await fetch(
+    `https://api.github.com/repos/${owner}/${repo}/git/trees/${branch}?recursive=1`,
+    { headers: GITHUB_HEADERS },
+  );
+  if (!treeRes.ok) return [];
+  const data = (await treeRes.json()) as {
+    tree?: { type: string; path: string }[];
+  };
+  return (data.tree || [])
+    .filter((f) => f.type === "blob" && !REPO_SKIP_DIRS.test(f.path))
+    .map((f) => f.path);
+}
+
+async function fetchRawFile(
+  owner: string,
+  repo: string,
+  branch: string,
+  filePath: string,
+): Promise<string | null> {
+  const url = `https://raw.githubusercontent.com/${owner}/${repo}/${branch}/${filePath}`;
+  try {
+    const res = await fetch(url, { headers: { "User-Agent": "VideoCreator/1.0" } });
+    if (!res.ok) return null;
+    const text = await res.text();
+    return text.length > 80000 ? text.slice(0, 80000) + "\n... (truncated)" : text;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * explore_repo — single call that returns file tree + auto-fetches key design files.
+ * Replaces the old list_repo_files. The agent gets everything it needs in ONE call.
+ */
+export const exploreRepo = httpAction(async (ctx, request) => {
   try {
     const body = await request.json();
     const params = parseBody(body);
     const projectId = params.projectId as Id<"projects">;
-    const directory = params.directory ? String(params.directory) : undefined;
-    const extension = params.extension ? String(params.extension) : undefined;
-    const maxResults = toNumber(params.maxResults, 200);
 
     const project = await ctx.runQuery(api.projects.getProjectById, { projectId });
     if (!project?.githubUrl) return errorJson("Project has no GitHub URL");
@@ -766,45 +1046,99 @@ export const listRepoFiles = httpAction(async (ctx, request) => {
     const parsed = parseGithubUrl(project.githubUrl);
     if (!parsed) return errorJson("Invalid GitHub URL on project");
 
-    const metaRes = await fetch(
-      `https://api.github.com/repos/${parsed.owner}/${parsed.repo}`,
-      { headers: GITHUB_HEADERS },
+    const branch = await resolveRepoBranch(parsed.owner, parsed.repo);
+    const allFiles = await getRepoTree(parsed.owner, parsed.repo, branch);
+
+    const designFiles = allFiles.filter((f) =>
+      DESIGN_FILE_PATTERNS.some((p) => p.test(f)),
     );
-    const meta = metaRes.ok
-      ? (await metaRes.json()) as { default_branch?: string }
-      : null;
-    const branch = meta?.default_branch || "main";
 
-    const treeRes = await fetch(
-      `https://api.github.com/repos/${parsed.owner}/${parsed.repo}/git/trees/${branch}?recursive=1`,
-      { headers: GITHUB_HEADERS },
+    const designSnippets: Record<string, { snippet: string; totalLines: number; hasMore: boolean }> = {};
+    await Promise.all(
+      designFiles.slice(0, 4).map(async (f) => {
+        const content = await fetchRawFile(parsed.owner, parsed.repo, branch, f);
+        if (content) {
+          const lines = content.split("\n");
+          const preview = lines.slice(0, 20);
+          designSnippets[f] = {
+            snippet: preview.map((l, i) => `${i + 1}| ${l}`).join("\n"),
+            totalLines: lines.length,
+            hasMore: lines.length > 20,
+          };
+        }
+      }),
     );
-    if (!treeRes.ok) return errorJson("Could not fetch repo tree");
 
-    const treeData = (await treeRes.json()) as {
-      tree?: { type: string; path: string }[];
-    };
-
-    let files = (treeData.tree || [])
-      .filter((f) => f.type === "blob" && !REPO_SKIP_DIRS.test(f.path))
-      .map((f) => f.path);
-
-    if (directory) {
-      const dir = directory.replace(/\/$/, "");
-      files = files.filter((f) => f.startsWith(dir + "/") || f === dir);
+    const byDir: Record<string, string[]> = {};
+    for (const f of allFiles) {
+      const dir = f.includes("/") ? f.slice(0, f.lastIndexOf("/")) : ".";
+      if (!byDir[dir]) byDir[dir] = [];
+      byDir[dir].push(f.slice(f.lastIndexOf("/") + 1));
     }
 
-    if (extension) {
-      const ext = extension.startsWith(".") ? extension : `.${extension}`;
-      files = files.filter((f) => f.endsWith(ext));
-    }
-
-    return json({ files: files.slice(0, maxResults), total: files.length });
+    return json({
+      totalFiles: allFiles.length,
+      tree: byDir,
+      designFiles: Object.keys(designSnippets),
+      designSnippets,
+      tip: "Use read_file to see more of any file. Pass startLine to paginate.",
+    });
   } catch (e) {
-    return errorJson("list_repo_files failed", String(e));
+    return errorJson("explore_repo failed", String(e));
   }
 });
 
+/**
+ * read_file — paginated single-file reading. Returns a window of lines.
+ * Replaces the old batch read_files so the agent never gets context-flooded.
+ */
+export const readFile = httpAction(async (ctx, request) => {
+  try {
+    const body = await request.json();
+    const params = parseBody(body);
+    const projectId = params.projectId as Id<"projects">;
+    const filePath = String(params.path || "");
+    const startLine = toNumber(params.startLine, 0);
+    const numLines = toNumber(params.numLines, 40);
+
+    if (!filePath) return errorJson("path is required");
+
+    const project = await ctx.runQuery(api.projects.getProjectById, { projectId });
+    if (!project?.githubUrl) return errorJson("Project has no GitHub URL");
+
+    const parsed = parseGithubUrl(project.githubUrl);
+    if (!parsed) return errorJson("Invalid GitHub URL on project");
+
+    const branch = await resolveRepoBranch(parsed.owner, parsed.repo);
+    const raw = await fetchRawFile(parsed.owner, parsed.repo, branch, filePath);
+    if (raw === null) return errorJson(`File not found: ${filePath}`);
+
+    const allLines = raw.split("\n");
+    const totalLines = allLines.length;
+    const clamped = Math.max(0, Math.min(startLine, totalLines));
+    const window = allLines.slice(clamped, clamped + numLines);
+    const endLine = clamped + window.length;
+
+    const numbered = window.map((l, i) => `${clamped + i + 1}| ${l}`).join("\n");
+
+    return json({
+      content: numbered,
+      startLine: clamped,
+      endLine,
+      totalLines,
+      hasMore: endLine < totalLines,
+    });
+  } catch (e) {
+    return errorJson("read_file failed", String(e));
+  }
+});
+
+// Backward-compat alias
+export const readFiles = readFile;
+
+/**
+ * search_repo — search across repo files for a pattern. Kept but optimized.
+ */
 export const searchRepoFiles = httpAction(async (ctx, request) => {
   try {
     const body = await request.json();
@@ -814,7 +1148,7 @@ export const searchRepoFiles = httpAction(async (ctx, request) => {
     const fileExtensions = params.fileExtensions
       ? String(params.fileExtensions).split(",").map((e) => e.trim())
       : undefined;
-    const maxFiles = toNumber(params.maxFiles, 15);
+    const maxFiles = toNumber(params.maxFiles, 10);
 
     if (!pattern) return errorJson("pattern is required");
 
@@ -824,31 +1158,12 @@ export const searchRepoFiles = httpAction(async (ctx, request) => {
     const parsed = parseGithubUrl(project.githubUrl);
     if (!parsed) return errorJson("Invalid GitHub URL on project");
 
-    const metaRes = await fetch(
-      `https://api.github.com/repos/${parsed.owner}/${parsed.repo}`,
-      { headers: GITHUB_HEADERS },
-    );
-    const meta = metaRes.ok
-      ? (await metaRes.json()) as { default_branch?: string }
-      : null;
-    const branch = meta?.default_branch || "main";
+    const branch = await resolveRepoBranch(parsed.owner, parsed.repo);
+    const allFiles = await getRepoTree(parsed.owner, parsed.repo, branch);
 
-    const treeRes = await fetch(
-      `https://api.github.com/repos/${parsed.owner}/${parsed.repo}/git/trees/${branch}?recursive=1`,
-      { headers: GITHUB_HEADERS },
-    );
-    if (!treeRes.ok) return errorJson("Could not fetch repo tree");
-
-    const treeData = (await treeRes.json()) as {
-      tree?: { type: string; path: string }[];
-    };
-
-    let candidateFiles = (treeData.tree || [])
-      .filter((f) => f.type === "blob" && !REPO_SKIP_DIRS.test(f.path))
-      .map((f) => f.path);
-
+    let candidates = allFiles;
     if (fileExtensions && fileExtensions.length > 0) {
-      candidateFiles = candidateFiles.filter((f) =>
+      candidates = candidates.filter((f) =>
         fileExtensions.some((ext) => {
           const e = ext.startsWith(".") ? ext : `.${ext}`;
           return f.endsWith(e);
@@ -856,22 +1171,17 @@ export const searchRepoFiles = httpAction(async (ctx, request) => {
       );
     }
 
-    candidateFiles = candidateFiles.slice(0, maxFiles * 3);
+    candidates = candidates.slice(0, maxFiles * 3);
 
     const matches: { path: string; matches: { line: number; text: string }[] }[] = [];
-    let filesSearched = 0;
+    let searched = 0;
 
-    for (const filePath of candidateFiles) {
-      if (filesSearched >= maxFiles) break;
-
-      const url = `https://raw.githubusercontent.com/${parsed.owner}/${parsed.repo}/${branch}/${filePath}`;
-      try {
-        const res = await fetch(url, { headers: { "User-Agent": "VideoCreator/1.0" } });
-        if (!res.ok) continue;
-        const content = await res.text();
-        filesSearched++;
-
-        if (content.length > 100000) continue;
+    await Promise.all(
+      candidates.map(async (filePath) => {
+        if (searched >= maxFiles) return;
+        const content = await fetchRawFile(parsed.owner, parsed.repo, branch, filePath);
+        if (!content) return;
+        searched++;
 
         const lines = content.split("\n");
         const fileMatches: { line: number; text: string }[] = [];
@@ -881,22 +1191,23 @@ export const searchRepoFiles = httpAction(async (ctx, request) => {
           if (re.test(lines[i])) {
             const start = Math.max(0, i - 1);
             const end = Math.min(lines.length - 1, i + 1);
-            const context = lines.slice(start, end + 1).join("\n");
-            fileMatches.push({ line: i + 1, text: context });
+            fileMatches.push({ line: i + 1, text: lines.slice(start, end + 1).join("\n") });
             re.lastIndex = 0;
           }
         }
 
         if (fileMatches.length > 0) {
-          matches.push({ path: filePath, matches: fileMatches.slice(0, 10) });
+          matches.push({ path: filePath, matches: fileMatches.slice(0, 5) });
         }
-      } catch {
-        continue;
-      }
-    }
+      }),
+    );
 
-    return json({ results: matches, filesSearched });
+    return json({ results: matches, filesSearched: searched });
   } catch (e) {
     return errorJson("search_repo_files failed", String(e));
   }
 });
+
+// Keep old endpoints as aliases for backward compatibility
+export const listRepoFiles = exploreRepo;
+export const fetchGithubFile = readFiles;

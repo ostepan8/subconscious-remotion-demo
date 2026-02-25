@@ -44,6 +44,7 @@ export const SYSTEM_PROMPT = `You are a creative director and video strategist e
 - **search_repo_files**: Grep/search across repo files for a pattern (e.g. hex colors, font-family, CSS variables). Returns matching lines with context.
 - **save_design_context**: Save the structured brand identity you've extracted. Call this after analyzing the repo's design files so all scenes use the correct brand colors and fonts.
 - **generate_component**: Spawn a coding subagent that generates a custom Remotion scene component. The subagent has full access to the GitHub repo and produces a real React component that faithfully represents the product's UI. Use for high-fidelity, custom-built scenes instead of the generic component-showcase mockup approach. See "Generated Scenes" section below for workflow.
+- **edit_generated_scene**: Edit the code of an existing generated scene. Makes targeted changes (layout tweaks, color updates, adding/removing elements) without regenerating from scratch. Provide a sceneId and a specific instruction describing what to change. The scene updates in real-time.
 
 ## Mandatory Knowledge Loading
 **BEFORE creating any scenes, you MUST call both of these — no exceptions:**
@@ -364,6 +365,15 @@ A coding subagent writes a real Remotion React component with full access to the
    - \`componentName\`: optional name like "Dashboard" or "PricingPage"
 
 The scene will immediately appear in the video with an animated loading placeholder. The subagent works in the background — when it finishes, the scene updates in real-time to show the generated component. You do NOT need to wait for generation to complete — continue building other scenes.
+
+**Editing existing generated scenes (edit_generated_scene):**
+Use \`edit_generated_scene\` when a generated scene already exists and you want to modify it — layout changes, color tweaks, adding/removing elements, fixing issues. This is faster than regenerating from scratch.
+- \`sceneId\`: the generated scene to edit
+- \`instruction\`: specific description of what to change (e.g. "make the sidebar 300px wide", "change the header text to 'Welcome Back'", "add a progress bar below the stats grid")
+
+**When to use generate_component vs edit_generated_scene:**
+- **generate_component**: Starting from scratch — no code exists yet, or you want to completely redo a scene with a new concept
+- **edit_generated_scene**: Modifying existing code — the scene already has generated code and you want targeted changes
 
 **Writing good intents:**
 - BAD: "Show the navbar"
@@ -970,6 +980,33 @@ export function buildTools(
           },
         },
         required: ["sceneId", "intent"],
+        additionalProperties: false,
+      },
+      defaults: { projectId },
+    },
+    {
+      type: "function" as const,
+      name: "edit_generated_scene",
+      description:
+        "Edit the code of an existing generated scene. Reads the scene's current generatedCode, applies your instruction via an AI editor, validates the result, and saves it back. Use for targeted changes (layout tweaks, color changes, adding/removing elements, fixing issues) without regenerating from scratch. The scene updates in real-time.",
+      url: `${convexSiteUrl}/tools/edit-generated-scene${s}`,
+      method: "POST" as const,
+      timeout: 120,
+      parameters: {
+        type: "object" as const,
+        properties: {
+          projectId: projectIdProp,
+          sceneId: {
+            type: "string" as const,
+            description: "The generated scene ID to edit",
+          },
+          instruction: {
+            type: "string" as const,
+            description:
+              "What to change in the component. Be specific: 'make the sidebar 300px wide and add a Settings nav item', 'change the background to #1a1a2e', 'add a progress bar below the stats cards'. The more specific, the better the edit.",
+          },
+        },
+        required: ["sceneId", "instruction"],
         additionalProperties: false,
       },
       defaults: { projectId },

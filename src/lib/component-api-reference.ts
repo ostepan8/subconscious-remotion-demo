@@ -38,22 +38,40 @@ All take frame (number) as first arg and delay (number, in FRAMES not seconds) a
 - horizontalWipe(frame, delay, dur?, direction?) → { clipPath }
 - parallaxLayer(frame, speed?, direction?) → { transform }
 - fadeOutDown(frame, startFrame, dur?, distance?) → { opacity, transform }
+- staggerEntrance(frame, index, baseDelay, spacing?) → CSSProperties
+  Picks a different entrance animation per index (fadeInUp, slideFromLeft, scaleIn, slideFromRight).
+  Great for animating lists/grids.
+  Example: staggerEntrance(frame, i, 0, 10) — each item enters 10 frames apart
+- floatY(frame, amplitude?, speed?, phase?) → { transform }
+  Continuous subtle y-axis floating after entrance. Good for cards/icons.
+- breathe(frame, speed?, amount?, phase?) → { transform }
+  Continuous subtle scale pulse for cards/elements.
 
 IMPORTANT: delay is in FRAMES (integers like 0, 5, 10, 15, 20), NOT seconds or floats.
 Correct: fadeInUp(frame, 10, 20)
 WRONG:   fadeInUp(frame, 0.5, 20)   ← 0.5 is not a valid frame number
 
-### Style helpers (in scope — do NOT import)
-- meshGradientStyle(theme) → CSSProperties (radial gradient bg)
+### Background & decoration helpers (in scope — do NOT import)
+- animatedMeshBg(frame, theme) → CSSProperties (animated radial gradient background)
+  Use as: style={{ ...animatedMeshBg(frame, theme) }} on a background layer div.
+- meshGradientStyle(theme) → CSSProperties (static radial gradient bg)
 - gridPatternStyle(theme) → CSSProperties (grid overlay)
 - noiseOverlayStyle() → CSSProperties
 - glowOrbStyle(frame, color, size, xPercent, yPercent, delay?) → CSSProperties
   Example: glowOrbStyle(frame, theme.colors.primary, 400, "20%", "30%", 0)
+- scanLineStyle(frame, delay, color, dur?) → CSSProperties
+  Animated horizontal scanning line that sweeps down.
+- glowBorderStyle(frame, color, delay?) → CSSProperties
+  Rotating gradient border glow around an element.
+
+### Surface & card helpers (in scope — do NOT import)
 - glassSurface(theme) → CSSProperties (translucent bg + blur)
 - glassCard(theme, radius?) → CSSProperties (glassSurface + borderRadius)
 - depthShadow(theme?) → string (a boxShadow value, use as: boxShadow: depthShadow())
   WRONG: ...depthShadow()  ← spreading a string crashes
 - gradientText(fromColor, toColor) → CSSProperties
+- themedHeadlineStyle(theme) → CSSProperties (gradient text using theme colors)
+- themedButtonStyle(theme) → CSSProperties (styled button with theme primary color)
 - accentColor(theme, index?) → string (hex color)
 - shimmerStyle() → CSSProperties
 - isThemeDark(theme) → boolean
@@ -64,6 +82,8 @@ WRONG:   fadeInUp(frame, 0.5, 20)   ← 0.5 is not a valid frame number
   Each has: { fontSize, fontWeight, lineHeight?, letterSpacing?, fontFamily?, textTransform? }
   Correct:   const typo = getTypography(theme);
   WRONG:     const { typo } = getTypography(theme);  ← getTypography returns the object directly
+- typo → alias for typography (raw presets). You can use typo.stat, typo.body etc. directly.
+  If you call getTypography(theme), assign it to a local variable (e.g. const typo = getTypography(theme)).
 - spacing → { scenePadding: 80, scenePaddingX: 100, sectionGap: 56, cardGap: 24, cardPadding: 32, borderRadius: { sm: 10, md: 16, lg: 24, xl: 32 } }
 - typography → raw typography presets (prefer getTypography(theme) for font-aware versions)
 - easings → { smooth, snappy, spring, elastic, decel, bounce } (each is t→t)
@@ -83,7 +103,6 @@ content: { headline, subtext, buttonText, bullets, features, steps, stats, quest
 1. Your function MUST be named: function GeneratedComponent({ content, theme })
 2. Do NOT import or export anything. All helpers above are already in scope.
 3. Do NOT invent functions. If it's not listed above, it DOES NOT EXIST.
-   Common mistakes: staggerEntrance, animatedMeshBg, createAnimation, fadeIn — NONE of these exist.
 4. Use FRAME numbers (integers) for delays, not seconds/floats.
 5. Use AbsoluteFill as the root wrapper.
 6. Always call useCurrentFrame() to get the frame variable.

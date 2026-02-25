@@ -363,11 +363,13 @@ const ALREADY_MOCKED = new Set([
   "fadeInBlur", "fadeInUp", "scaleIn", "slideFromLeft", "slideFromRight",
   "glowPulse", "revealLine", "animatedNumber", "typewriterReveal",
   "counterSpinUp", "horizontalWipe", "parallaxLayer", "fadeOutDown",
+  "animatedMeshBg", "staggerEntrance", "floatY", "scanLineStyle",
+  "breathe", "glowBorderStyle", "themedHeadlineStyle", "themedButtonStyle",
   "meshGradientStyle", "gridPatternStyle", "noiseOverlayStyle",
   "glowOrbStyle", "glassSurface", "glassCard", "depthShadow",
   "gradientText", "accentColor", "shimmerStyle",
   "isThemeDark", "mergeThemeWithOverrides",
-  "easings", "spacing", "typography", "getTypography",
+  "easings", "spacing", "typography", "typo", "getTypography",
   "MockupPlaceholder",
   "Fragment", "h",
 ]);
@@ -679,6 +681,66 @@ const fadeOutDown = (frame: number, startFrame: number, dur = 18, distance = 40)
   return { opacity: o, transform: \`translateY(\${y}px)\` };
 };
 
+const animatedMeshBg = (frame: number, theme: any) => {
+  const x1 = interpolate(frame, [0, 120], [20, 35], { extrapolateRight: 'clamp' });
+  const y1 = interpolate(frame, [0, 90], [30, 45], { extrapolateRight: 'clamp' });
+  const x2 = interpolate(frame, [0, 100], [80, 65], { extrapolateRight: 'clamp' });
+  const y2 = interpolate(frame, [0, 110], [70, 55], { extrapolateRight: 'clamp' });
+  const p = theme?.colors?.primary || '#61dafb';
+  const a = theme?.colors?.accent || '#f97316';
+  const s = theme?.colors?.secondary || '#a78bfa';
+  return {
+    position: 'absolute' as const, inset: 0,
+    background: [
+      \`radial-gradient(ellipse 80% 50% at \${x1}% \${y1}%, \${p}28 0%, transparent 60%)\`,
+      \`radial-gradient(ellipse 60% 70% at \${x2}% \${y2}%, \${a}22 0%, transparent 55%)\`,
+      \`radial-gradient(ellipse 90% 40% at 50% 0%, \${s}18 0%, transparent 50%)\`,
+    ].join(', '),
+  };
+};
+const staggerEntrance = (frame: number, index: number, baseDelay: number, spacingVal = 10) => {
+  const delay = baseDelay + index * spacingVal;
+  const variant = index % 4;
+  if (variant === 0) return fadeInUp(frame, delay, 35, 22);
+  if (variant === 1) return slideFromLeft(frame, delay, 45, 22);
+  if (variant === 2) return scaleIn(frame, delay, 22);
+  return slideFromRight(frame, delay, 45, 22);
+};
+const floatY = (frame: number, amplitude = 6, speed = 0.05, phase = 0) => {
+  const y = Math.sin((frame + phase) * speed) * amplitude;
+  return { transform: \`translateY(\${y}px)\` };
+};
+const scanLineStyle = (frame: number, delay: number, color: string, dur = 40) => {
+  const pos = interpolate(frame, [delay, delay + dur], [-5, 105], { extrapolateRight: 'clamp', extrapolateLeft: 'clamp' });
+  const opacity = interpolate(frame, [delay, delay + 8, delay + dur - 8, delay + dur], [0, 0.7, 0.7, 0], { extrapolateRight: 'clamp', extrapolateLeft: 'clamp' });
+  return {
+    position: 'absolute' as const, left: 0, right: 0, top: \`\${pos}%\`, height: 2,
+    background: \`linear-gradient(90deg, transparent 0%, \${color} 30%, \${color} 70%, transparent 100%)\`,
+    boxShadow: \`0 0 20px \${color}60, 0 0 60px \${color}30\`, opacity, pointerEvents: 'none' as const, zIndex: 10,
+  };
+};
+const breathe = (frame: number, speed = 0.04, amount = 0.008, phase = 0) => {
+  const s = 1 + Math.sin((frame + phase) * speed) * amount;
+  return { transform: \`scale(\${s})\` };
+};
+const glowBorderStyle = (frame: number, color: string, delay = 0) => {
+  const angle = interpolate(frame, [delay, delay + 120], [0, 360], { extrapolateRight: 'clamp' });
+  const opacity = interpolate(frame, [delay, delay + 20], [0, 1], { extrapolateRight: 'clamp', extrapolateLeft: 'clamp' });
+  return {
+    position: 'absolute' as const, inset: -1, borderRadius: 'inherit',
+    background: \`conic-gradient(from \${angle}deg, transparent 0%, \${color}40 25%, transparent 50%, \${color}25 75%, transparent 100%)\`,
+    opacity, pointerEvents: 'none' as const, zIndex: -1,
+  };
+};
+const themedHeadlineStyle = (theme: any) => ({
+  background: \`linear-gradient(135deg, \${theme?.colors?.text || '#fff'}, \${theme?.colors?.primary || '#61dafb'})\`,
+  backgroundClip: 'text', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', color: 'transparent',
+});
+const themedButtonStyle = (theme: any) => ({
+  background: theme?.colors?.primary || '#61dafb', color: '#fff', border: 'none',
+  borderRadius: 12, padding: '12px 28px', fontWeight: 700, fontSize: 16, cursor: 'pointer',
+});
+
 const meshGradientStyle = (theme: any) => ({
   position: 'absolute' as const, inset: 0,
   background: \`radial-gradient(ellipse at 20% 30%, \${theme?.colors?.primary || '#61dafb'}12 0%, transparent 60%)\`,
@@ -766,6 +828,8 @@ const getTypography = (theme?: any) => {
   };
 };
 
+var typo = typography;
+
 const MockupPlaceholder = (p: any) =>
   React.createElement('div', {
     style: { background: '#1a1a2e', borderRadius: 12, border: '1px solid rgba(255,255,255,0.1)',
@@ -850,6 +914,7 @@ ${cleaned}
   }
 
   // 6. Error boundary class (plain JS)
+  var __hasCaughtError = false;
   function ErrorBoundary() {}
   ErrorBoundary.prototype = Object.create(React.Component.prototype);
   ErrorBoundary.prototype.constructor = ErrorBoundary;
@@ -861,6 +926,7 @@ ${cleaned}
     return this.props.children;
   };
   ErrorBoundary.getDerivedStateFromError = function(e) {
+    __hasCaughtError = true;
     var errMsg = e.message || String(e);
     try { parent.postMessage({ type: 'preview-error', error: 'Component error: ' + errMsg }, '*'); } catch(x) {}
     return { error: errMsg };
@@ -881,6 +947,12 @@ ${cleaned}
       return function() { clearInterval(id); };
     }, []);
 
+    React.useEffect(function() {
+      if (!__hasCaughtError) {
+        try { parent.postMessage({ type: 'preview-success' }, '*'); } catch(x) {}
+      }
+    }, []);
+
     if (!__Comp) {
       return React.createElement('div', { className: 'error-box' },
         'No component found to render.');
@@ -895,7 +967,6 @@ ${cleaned}
   // 8. Render
   try {
     ReactDOM.createRoot(rootEl).render(React.createElement(PreviewWrapper));
-    try { parent.postMessage({ type: 'preview-success' }, '*'); } catch(x) {}
   } catch(e) { showError('Render', e); }
 })();
 <\/script>
@@ -1909,6 +1980,7 @@ function CustomComponentsSection({
   const scenes = useQuery(api.scenes.getScenes, { projectId });
   const project = useQuery(api.projects.getProjectById, { projectId });
   const removeComponent = useMutation(api.customComponents.remove);
+  const removeScene = useMutation(api.scenes.removeScene);
   const updateScene = useMutation(api.scenes.updateScene);
   const saveComponentCode = useMutation(api.customComponents.saveCode);
   const [expanded, setExpanded] = useState(true);
@@ -2015,6 +2087,9 @@ function CustomComponentsSection({
                   });
                 }
               }}
+              onDelete={() =>
+                removeScene({ sceneId: scene._id })
+              }
             />
           ))}
           {customComponents?.map((comp) => (
@@ -2552,6 +2627,7 @@ function CustomComponentCard({
 function GeneratedSceneCard({
   scene,
   onPreview,
+  onDelete,
 }: {
   scene: {
     _id: Id<"scenes">;
@@ -2559,6 +2635,7 @@ function GeneratedSceneCard({
     content: Record<string, unknown>;
   };
   onPreview: () => void;
+  onDelete: () => void;
 }) {
   const status =
     (scene.content?.generationStatus as string) || "pending";
@@ -2651,6 +2728,20 @@ function GeneratedSceneCard({
             Preview
           </button>
         )}
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onDelete();
+          }}
+          className="text-[9px] w-5 h-5 rounded flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
+          style={{
+            color: "#ef4444",
+            background: "rgba(239,68,68,0.08)",
+          }}
+          title="Delete"
+        >
+          ×
+        </button>
       </div>
 
       {(status === "generating" || status === "pending") && (
@@ -2791,8 +2882,16 @@ function ComponentLivePreview({
   const [autoMocked, setAutoMocked] = useState<string[]>(
     [],
   );
+  const [compileStatus, setCompileStatus] = useState<
+    "idle" | "compiling" | "success" | "error"
+  >("idle");
   const chatEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const justEditedRef = useRef(false);
+  const autoFixCountRef = useRef(0);
+  const sendChatMessageRef = useRef<
+    ((msg: string) => void) | null
+  >(null);
 
   useEffect(() => {
     setLiveCode(component.code);
@@ -2811,8 +2910,44 @@ function ComponentLivePreview({
     const handler = (e: MessageEvent) => {
       if (e.data?.type === "preview-error") {
         setPreviewError(e.data.error);
+        if (
+          justEditedRef.current &&
+          autoFixCountRef.current < 2
+        ) {
+          justEditedRef.current = false;
+          autoFixCountRef.current += 1;
+          const errMsg = e.data.error;
+          const fixPrompt = `The code you just produced has a RUNTIME ERROR:\n\`\`\`\n${errMsg}\n\`\`\`\n\nFix this error. The preview crashed after your edit. Check for undefined variables, wrong function usage, or type mismatches.`;
+          setChatMessages((prev) => [
+            ...prev,
+            { role: "user", content: `Auto-fix: runtime error detected` },
+          ]);
+          setTimeout(() => {
+            sendChatMessageRef.current?.(fixPrompt);
+          }, 100);
+        }
       } else if (e.data?.type === "preview-success") {
         setPreviewError(null);
+        if (justEditedRef.current) {
+          justEditedRef.current = false;
+          autoFixCountRef.current = 0;
+          setChatMessages((prev) => {
+            const last = prev[prev.length - 1];
+            if (
+              last?.role === "assistant" &&
+              !last.content.includes("✓ Preview OK")
+            ) {
+              const updated = [...prev];
+              updated[updated.length - 1] = {
+                ...last,
+                content:
+                  last.content + "\n\n✓ Preview OK — component renders successfully.",
+              };
+              return updated;
+            }
+            return prev;
+          });
+        }
       } else if (e.data?.type === "preview-warning") {
         setAutoMocked(e.data.autoMocked || []);
       }
@@ -2864,10 +2999,70 @@ function ComponentLivePreview({
   }, [liveCode, onSaveCode]);
 
   const handleRecompile = useCallback(() => {
-    setPreviewKey((k) => k + 1);
+    setCompileStatus("compiling");
     setPreviewError(null);
     setAutoMocked([]);
-  }, []);
+
+    const testSrcdoc = buildComponentSrcdoc(
+      liveCode,
+      "GeneratedComponent",
+      {
+        content: DEFAULT_CONTENT,
+        theme: JSON.stringify(theme),
+      },
+    );
+
+    const iframe = document.createElement("iframe");
+    iframe.sandbox.add("allow-scripts");
+    iframe.style.cssText =
+      "position:fixed;width:1px;height:1px;opacity:0;pointer-events:none;left:-9999px;top:-9999px";
+    iframe.srcdoc = testSrcdoc;
+
+    let settled = false;
+    const cleanup = () => {
+      if (settled) return;
+      settled = true;
+      try {
+        iframe.remove();
+      } catch {
+        /* noop */
+      }
+    };
+
+    const onMsg = (e: MessageEvent) => {
+      if (settled) return;
+      if (e.data?.type === "preview-error") {
+        cleanup();
+        window.removeEventListener("message", onMsg);
+        setPreviewError(e.data.error);
+        setCompileStatus("error");
+      } else if (e.data?.type === "preview-success") {
+        cleanup();
+        window.removeEventListener("message", onMsg);
+        setPreviewError(null);
+        setCompileStatus("success");
+        setPreviewKey((k) => k + 1);
+        setTimeout(
+          () => setCompileStatus("idle"),
+          2500,
+        );
+      } else if (e.data?.type === "preview-warning") {
+        setAutoMocked(e.data.autoMocked || []);
+      }
+    };
+
+    window.addEventListener("message", onMsg);
+    document.body.appendChild(iframe);
+
+    setTimeout(() => {
+      if (!settled) {
+        cleanup();
+        window.removeEventListener("message", onMsg);
+        setPreviewError("Compile check timed out — no response from sandbox");
+        setCompileStatus("error");
+      }
+    }, 8000);
+  }, [liveCode, theme]);
 
   const sendChatMessage = useCallback(
     async (msgText: string) => {
@@ -2916,15 +3111,45 @@ function ComponentLivePreview({
 
             try {
               const event = JSON.parse(payload);
-              if (event.type === "done" && event.code) {
+              if (event.type === "status") {
+                setChatMessages((prev) => {
+                  const updated = [...prev];
+                  updated[updated.length - 1] = {
+                    role: "assistant",
+                    content:
+                      event.message ||
+                      "Validating...",
+                  };
+                  return updated;
+                });
+              } else if (
+                event.type === "done" &&
+                event.code
+              ) {
                 setLiveCode(event.code);
-                setDirty(true);
                 setPreviewError(null);
                 setAutoMocked([]);
+                justEditedRef.current = true;
                 setPreviewKey((k) => k + 1);
-                const explanation =
+
+                onSaveCode(event.code).then(() => {
+                  setDirty(false);
+                }).catch((err) => {
+                  console.error("Auto-save after edit failed:", err);
+                  setDirty(true);
+                });
+
+                let explanation =
                   event.explanation ||
                   "Changes applied.";
+                if (event.validated === false) {
+                  explanation +=
+                    "\n\n⚠️ Validation issue detected — check preview for runtime errors.";
+                }
+
+                explanation +=
+                  "\n\n✅ Saved & recompiling preview...";
+
                 setChatMessages((prev) => {
                   const updated = [...prev];
                   updated[updated.length - 1] = {
@@ -2961,8 +3186,10 @@ function ComponentLivePreview({
         setIsStreaming(false);
       }
     },
-    [isStreaming, liveCode, chatMessages],
+    [isStreaming, liveCode, chatMessages, onSaveCode],
   );
+
+  sendChatMessageRef.current = sendChatMessage;
 
   const handleFixWithAI = useCallback(() => {
     if (!previewError) return;
@@ -3007,11 +3234,12 @@ function ComponentLivePreview({
       }}
     >
       <div
-        className="max-h-[92vh] rounded-2xl overflow-hidden flex flex-col shadow-2xl"
+        className="rounded-2xl overflow-hidden flex flex-col shadow-2xl"
         style={{
           background: "var(--background)",
           border: "1px solid var(--border-subtle)",
-          width: "min(1400px, 95vw)",
+          width: "96vw",
+          height: "94vh",
         }}
         onClick={(e) => e.stopPropagation()}
       >
@@ -3054,24 +3282,69 @@ function ComponentLivePreview({
           <div className="flex items-center gap-1.5 pr-2">
             <button
               onClick={handleRecompile}
-              className="text-[10px] px-2 py-1 rounded-md font-medium transition-all flex items-center gap-1 hover:opacity-80"
+              disabled={compileStatus === "compiling"}
+              className="text-[10px] px-2 py-1 rounded-md font-medium transition-all flex items-center gap-1 hover:opacity-80 disabled:opacity-50"
               style={{
-                background: "var(--border-subtle)",
-                color: "var(--muted)",
+                background:
+                  compileStatus === "success"
+                    ? "rgba(62,208,195,0.15)"
+                    : compileStatus === "error"
+                      ? "rgba(239,68,68,0.12)"
+                      : "var(--border-subtle)",
+                color:
+                  compileStatus === "success"
+                    ? "var(--brand-teal)"
+                    : compileStatus === "error"
+                      ? "#ef4444"
+                      : "var(--muted)",
               }}
-              title="Re-run the component"
+              title="Compile and check for errors"
             >
-              <svg
-                width="10"
-                height="10"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2.5"
-              >
-                <path d="M21 2v6h-6M3 12a9 9 0 0 1 15-6.7L21 8M3 22v-6h6M21 12a9 9 0 0 1-15 6.7L3 16" />
-              </svg>
-              Recompile
+              {compileStatus === "compiling" ? (
+                <span
+                  className="w-2.5 h-2.5 border-[1.5px] border-current border-t-transparent rounded-full animate-spin"
+                />
+              ) : compileStatus === "success" ? (
+                <svg
+                  width="10"
+                  height="10"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="3"
+                >
+                  <path d="M20 6L9 17l-5-5" />
+                </svg>
+              ) : compileStatus === "error" ? (
+                <svg
+                  width="10"
+                  height="10"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="3"
+                >
+                  <path d="M18 6L6 18M6 6l12 12" />
+                </svg>
+              ) : (
+                <svg
+                  width="10"
+                  height="10"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2.5"
+                >
+                  <path d="M6 3l12 9-12 9V3z" />
+                </svg>
+              )}
+              {compileStatus === "compiling"
+                ? "Compiling..."
+                : compileStatus === "success"
+                  ? "Compiled"
+                  : compileStatus === "error"
+                    ? "Failed"
+                    : "Compile"}
             </button>
             <button
               onClick={handleCopy}
@@ -3131,10 +3404,7 @@ function ComponentLivePreview({
         {/* Content: left=preview/source, right=chat */}
         <div
           className="flex-1 flex overflow-hidden"
-          style={{
-            minHeight: 0,
-            height: "min(80vh, 720px)",
-          }}
+          style={{ minHeight: 0 }}
         >
           {/* Left panel */}
           <div className="flex-1 min-w-0 flex flex-col overflow-hidden">
@@ -3222,48 +3492,53 @@ function ComponentLivePreview({
               </div>
             )}
 
-            {tab === "preview" ? (
-              <div
-                className="flex-1 overflow-hidden"
-                style={{ background: "#0f0f17" }}
-              >
-                <iframe
-                  key={`preview-${previewKey}`}
-                  srcDoc={srcdoc}
-                  className="w-full h-full border-0"
-                  sandbox="allow-scripts"
-                  title={`Preview: ${component.name}`}
-                />
-              </div>
-            ) : (
-              <div
-                className="flex-1 overflow-auto p-4"
-                style={{ background: "#1e1e2e" }}
-              >
-                {sourceLines.map((line, i) => (
-                  <div
-                    key={i}
-                    className="flex items-start hover:bg-white/[0.03]"
-                    style={{
-                      fontFamily:
-                        "'SF Mono', 'Fira Code', monospace",
-                      fontSize: "13px",
-                      lineHeight: "22px",
-                    }}
-                  >
-                    <span
-                      className="shrink-0 w-12 text-right select-none pr-4"
-                      style={{ color: "#45475a" }}
+            <div
+              className="flex-1 relative"
+              style={{ minHeight: 0 }}
+            >
+              {tab === "preview" ? (
+                <div
+                  className="absolute inset-0 overflow-hidden"
+                  style={{ background: "#0f0f17" }}
+                >
+                  <iframe
+                    key={`preview-${previewKey}`}
+                    srcDoc={srcdoc}
+                    className="w-full h-full border-0"
+                    sandbox="allow-scripts"
+                    title={`Preview: ${component.name}`}
+                  />
+                </div>
+              ) : (
+                <div
+                  className="absolute inset-0 overflow-auto p-4"
+                  style={{ background: "#1e1e2e" }}
+                >
+                  {sourceLines.map((line, i) => (
+                    <div
+                      key={i}
+                      className="flex items-start hover:bg-white/[0.03]"
+                      style={{
+                        fontFamily:
+                          "'SF Mono', 'Fira Code', monospace",
+                        fontSize: "13px",
+                        lineHeight: "22px",
+                      }}
                     >
-                      {i + 1}
-                    </span>
-                    <span className="whitespace-pre">
-                      {colorizeCodeLine(line)}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            )}
+                      <span
+                        className="shrink-0 w-12 text-right select-none pr-4"
+                        style={{ color: "#45475a" }}
+                      >
+                        {i + 1}
+                      </span>
+                      <span className="whitespace-pre">
+                        {colorizeCodeLine(line)}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Right panel — AI Editor */}

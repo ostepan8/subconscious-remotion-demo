@@ -56,8 +56,8 @@ export default function Hero({ onStart }: HeroProps) {
           className="text-lg sm:text-xl max-w-2xl mx-auto mb-12 leading-relaxed animate-fade-in-up"
           style={{ color: "var(--muted)", animationDelay: "0.3s" }}
         >
-          Enter your product name, pick a theme, and an AI agent builds a
-          multi-scene promo video with animations, scripts, and voiceover.
+          Enter your product, pick a theme, and a Subconscious AI agent
+          builds a multi-scene video with animations, scripts, and voiceover.
           No editing skills needed.
         </p>
 

@@ -7,7 +7,7 @@ import { api } from "../../../convex/_generated/api";
 import { useRouter } from "next/navigation";
 import { themeList } from "@/components/video/themes";
 
-const STORAGE_KEY = "promoclip_draft";
+const STORAGE_KEY = "subconscious_vc_draft";
 
 interface DraftProject {
   title: string;

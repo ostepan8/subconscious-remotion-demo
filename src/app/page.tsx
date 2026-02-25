@@ -9,6 +9,7 @@ import Hero from "@/components/sections/Hero";
 import Features from "@/components/sections/Features";
 import HowItWorks from "@/components/sections/HowItWorks";
 import Link from "next/link";
+import SubconsciousLogo from "@/components/layout/SubconsciousLogo";
 
 const OnboardingWizard = dynamic(
   () => import("@/components/onboarding/OnboardingWizard"),
@@ -69,13 +70,7 @@ export default function Home() {
         >
           <div className="max-w-6xl mx-auto flex items-center justify-between">
             <div className="flex items-center gap-2 text-sm" style={{ color: "var(--muted)" }}>
-              <span
-                className="w-5 h-5 rounded flex items-center justify-center text-white text-[10px] font-bold"
-                style={{ background: "var(--brand-orange)" }}
-              >
-                PC
-              </span>
-              PromoClip
+              <SubconsciousLogo size={20} textClass="text-sm" />
             </div>
             <div className="text-xs" style={{ color: "var(--muted)" }}>
               Built with{" "}

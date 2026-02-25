@@ -1,6 +1,6 @@
-# PromoClip — AI Video Creator
+# Subconscious Video Creator
 
-An AI-powered promotional video creator built with **Next.js**, **Remotion**, **Convex**, **Subconscious SDK**, and **ElevenLabs**. A devrel demo for [Subconscious](https://subconscious.dev).
+An AI-powered video creator built with **Next.js**, **Remotion**, **Convex**, **Subconscious SDK**, and **ElevenLabs**. A devrel demo for [Subconscious](https://subconscious.dev).
 
 Users describe their product, pick a visual theme, and an AI agent builds a multi-scene promotional video with animations, scripts, and voiceover — all updating in real-time.
 

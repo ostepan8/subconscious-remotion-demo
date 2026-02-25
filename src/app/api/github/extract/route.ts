@@ -177,11 +177,11 @@ Rules:
   }
 }
 
-async function discoverRepoImages(
+async function fetchRepoTree(
   owner: string,
   repo: string,
   branch: string
-): Promise<{ url: string; name: string }[]> {
+): Promise<{ type: string; path: string }[]> {
   try {
     const res = await fetch(
       `https://api.github.com/repos/${owner}/${repo}/git/trees/${branch}?recursive=1`,
@@ -191,27 +191,180 @@ async function discoverRepoImages(
     const data = (await res.json()) as {
       tree?: { type: string; path: string }[];
     };
-
-    const results: { url: string; name: string; path: string }[] = [];
-
-    for (const item of data.tree || []) {
-      if (item.type !== "blob" || !IMAGE_EXTS.test(item.path)) continue;
-      if (SKIP_DIRS.test(item.path)) continue;
-
-      const rawUrl = `https://raw.githubusercontent.com/${owner}/${repo}/${branch}/${item.path}`;
-      const fileName = item.path.split("/").pop() || item.path;
-      results.push({ url: rawUrl, name: fileName, path: item.path });
-    }
-
-    results.sort(
-      (a, b) => imagePathPriority(a.path) - imagePathPriority(b.path)
+    return (data.tree || []).filter(
+      (f) => f.type === "blob" && !SKIP_DIRS.test(f.path)
     );
-
-    return results
-      .slice(0, MAX_REPO_IMAGES)
-      .map(({ url, name }) => ({ url, name }));
   } catch {
     return [];
+  }
+}
+
+function discoverImagesFromTree(
+  tree: { type: string; path: string }[],
+  owner: string,
+  repo: string,
+  branch: string
+): { url: string; name: string }[] {
+  const results: { url: string; name: string; path: string }[] = [];
+  for (const item of tree) {
+    if (!IMAGE_EXTS.test(item.path)) continue;
+    const rawUrl = `https://raw.githubusercontent.com/${owner}/${repo}/${branch}/${item.path}`;
+    const fileName = item.path.split("/").pop() || item.path;
+    results.push({ url: rawUrl, name: fileName, path: item.path });
+  }
+  results.sort(
+    (a, b) => imagePathPriority(a.path) - imagePathPriority(b.path)
+  );
+  return results
+    .slice(0, MAX_REPO_IMAGES)
+    .map(({ url, name }) => ({ url, name }));
+}
+
+// --- Design file scanner ---
+
+const DESIGN_FILE_PATTERNS: { pattern: RegExp; priority: number }[] = [
+  { pattern: /^tailwind\.config\.(js|ts|mjs|cjs)$/i, priority: 0 },
+  { pattern: /(^|\/)globals?\.css$/i, priority: 1 },
+  { pattern: /(^|\/)styles?\.(css)$/i, priority: 1 },
+  { pattern: /(^|\/)index\.css$/i, priority: 1 },
+  { pattern: /(^|\/)app\.css$/i, priority: 1 },
+  { pattern: /(^|\/)theme\.(ts|js|tsx|jsx|json)$/i, priority: 2 },
+  { pattern: /(^|\/)colors?\.(ts|js|json)$/i, priority: 2 },
+  { pattern: /(^|\/)palette\.(ts|js|json)$/i, priority: 2 },
+  { pattern: /(^|\/)chakra[-.]?theme\./i, priority: 2 },
+  { pattern: /(^|\/)mui[-.]?theme\./i, priority: 2 },
+  { pattern: /(^|\/)tokens?\.(ts|js|json|css)$/i, priority: 3 },
+  { pattern: /(^|\/)variables\.css$/i, priority: 3 },
+  { pattern: /(^|\/)vars\.css$/i, priority: 3 },
+  { pattern: /^components\.json$/i, priority: 4 },
+  { pattern: /^package\.json$/i, priority: 5 },
+];
+
+const MAX_DESIGN_FILES = 8;
+const MAX_DESIGN_FILE_LINES = 100;
+
+interface DesignFile {
+  path: string;
+  content: string;
+}
+
+async function scanDesignFiles(
+  tree: { path: string }[],
+  owner: string,
+  repo: string,
+  branch: string
+): Promise<DesignFile[]> {
+  const matches: { path: string; priority: number }[] = [];
+  for (const entry of tree) {
+    for (const { pattern, priority } of DESIGN_FILE_PATTERNS) {
+      if (pattern.test(entry.path)) {
+        matches.push({ path: entry.path, priority });
+        break;
+      }
+    }
+  }
+  matches.sort((a, b) => a.priority - b.priority);
+  const topFiles = matches.slice(0, MAX_DESIGN_FILES);
+
+  const results: DesignFile[] = [];
+  await Promise.all(
+    topFiles.map(async ({ path: filePath }) => {
+      const url = `https://raw.githubusercontent.com/${owner}/${repo}/${branch}/${filePath}`;
+      try {
+        const res = await fetch(url, { headers: GITHUB_HEADERS });
+        if (!res.ok) return;
+        const text = await res.text();
+        const truncated = text
+          .split("\n")
+          .slice(0, MAX_DESIGN_FILE_LINES)
+          .join("\n");
+        results.push({ path: filePath, content: truncated });
+      } catch {
+        /* skip */
+      }
+    })
+  );
+  return results;
+}
+
+// --- Design context extraction via agent ---
+
+interface DesignContext {
+  brandColors: Record<string, string>;
+  fonts: { heading?: string; body?: string };
+  designStyle: string;
+  designNotes: string;
+  cssVariables?: Record<string, string>;
+  borderRadius?: string;
+}
+
+async function extractDesignContext(
+  designFiles: DesignFile[],
+  allFilePaths: string[],
+  repoName: string,
+): Promise<DesignContext | null> {
+  const apiKey = process.env.SUBCONSCIOUS_API_KEY;
+  if (!apiKey || designFiles.length === 0) return null;
+
+  const fileContents = designFiles
+    .map((f) => `### ${f.path}\n\`\`\`\n${f.content}\n\`\`\``)
+    .join("\n\n");
+
+  const fileTree = allFilePaths.slice(0, 200).join("\n");
+
+  const prompt = `You are a design system analyzer extracting the visual identity from a GitHub repository called "${repoName}".
+
+## Design Files Found
+${fileContents}
+
+## Repository File Tree (for context)
+${fileTree}
+
+## Task
+Analyze the files above and extract the project's visual design identity. Return a valid JSON object:
+
+{
+  "brandColors": { "primary": "#hex", "secondary": "#hex", "accent": "#hex", "background": "#hex", "foreground": "#hex" },
+  "fonts": { "heading": "Font Name", "body": "Font Name" },
+  "designStyle": "short description like 'dark-modern with glass-morphism' or 'minimal-light with rounded corners'",
+  "designNotes": "2-3 sentences on the visual identity, layout, and notable design choices",
+  "cssVariables": { "--var-name": "value" },
+  "borderRadius": "default radius like '8px' or '12px'"
+}
+
+## Where to Look
+- tailwind.config: theme.extend.colors, theme.extend.fontFamily, theme.extend.borderRadius
+- CSS files: :root { --var: value } blocks, @import for Google Fonts, font-face declarations
+- package.json: dependencies for UI frameworks (@chakra-ui, @mui/material, antd, @radix-ui, tailwindcss, shadcn)
+- theme/colors files: exported color objects, palettes
+- components.json: shadcn configuration with base color and style
+
+## Rules
+- Return ONLY valid JSON — no markdown fencing, no explanation text
+- Use hex color codes (#RRGGBB)
+- Extract actual font family names (e.g., "Inter", "Geist", "Poppins"), not CSS generic families
+- If a value is unknown, use a reasonable default or omit it
+- brandColors must include at least: primary, background, foreground`;
+
+  try {
+    const client = new Subconscious({ apiKey });
+    const run = await client.run({
+      engine: SUBCONSCIOUS_ENGINE,
+      input: { instructions: prompt },
+      options: { awaitCompletion: true },
+    });
+
+    const answer = run.result?.answer;
+    if (!answer) return null;
+
+    const text = typeof answer === "string" ? answer : JSON.stringify(answer);
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) return null;
+
+    return JSON.parse(jsonMatch[0]) as DesignContext;
+  } catch (e) {
+    console.error("Design context extraction failed:", e);
+    return null;
   }
 }
 
@@ -503,11 +656,38 @@ export async function POST(req: NextRequest) {
 
         send({
           type: "progress",
-          message: "Scanning files, summarizing README & checking live site...",
+          message: "Scanning files, summarizing README & analyzing design...",
         });
 
-        const [repoImages, readmeSummary, ogImage] = await Promise.all([
-          discoverRepoImages(owner, repo, meta.default_branch),
+        const repoTree = await fetchRepoTree(owner, repo, meta.default_branch);
+
+        const repoImages = discoverImagesFromTree(
+          repoTree,
+          owner,
+          repo,
+          meta.default_branch
+        );
+
+        const designScanPromise = (async () => {
+          const designFiles = await scanDesignFiles(
+            repoTree,
+            owner,
+            repo,
+            meta.default_branch
+          );
+          if (designFiles.length === 0) return null;
+          send({
+            type: "progress",
+            message: `Found ${designFiles.length} design files, analyzing design system...`,
+          });
+          return extractDesignContext(
+            designFiles,
+            repoTree.map((f) => f.path),
+            meta.name || repo
+          );
+        })();
+
+        const [readmeSummary, ogImage, designCtx] = await Promise.all([
           summarizeReadme(
             readme,
             meta.name || repo,
@@ -518,6 +698,7 @@ export async function POST(req: NextRequest) {
                 siteUrl.startsWith("http") ? siteUrl : `https://${siteUrl}`
               )
             : Promise.resolve(null),
+          designScanPromise,
         ]);
 
         // Step 5: Build the extract
@@ -550,6 +731,25 @@ export async function POST(req: NextRequest) {
           });
         } catch (e) {
           console.error("Failed to save extract:", e);
+        }
+
+        if (designCtx) {
+          send({
+            type: "progress",
+            message: "Saving brand identity...",
+          });
+          try {
+            await convex.mutation(api.projects.saveDesignContext, {
+              projectId: projectId as Id<"projects">,
+              designContext: designCtx,
+            });
+            send({
+              type: "design_context",
+              designContext: designCtx,
+            });
+          } catch (e) {
+            console.error("Failed to save design context:", e);
+          }
         }
 
         // Step 7: Collect all images to import (deduplicated)

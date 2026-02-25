@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useConvexAuth } from "convex/react";
 import UserMenu from "@/components/auth/UserMenu";
+import SubconsciousLogo from "@/components/layout/SubconsciousLogo";
 
 interface NavbarProps {
   onStartCreating?: () => void;
@@ -21,13 +22,7 @@ export default function Navbar({ onStartCreating }: NavbarProps) {
     >
       <div className="max-w-7xl mx-auto flex items-center justify-between h-14 px-4 sm:px-6">
         <Link href="/" className="flex items-center gap-2 font-semibold text-lg tracking-tight">
-          <span
-            className="w-7 h-7 rounded-md flex items-center justify-center text-white text-xs font-bold"
-            style={{ background: "var(--brand-orange)" }}
-          >
-            PC
-          </span>
-          <span style={{ color: "var(--foreground)" }}>PromoClip</span>
+          <SubconsciousLogo size={28} textClass="text-lg" />
         </Link>
 
         <div className="flex items-center gap-3">

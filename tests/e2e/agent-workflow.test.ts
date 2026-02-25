@@ -77,7 +77,7 @@ describe("agent workflow: adding a scene", () => {
         projectId: "proj_test_123",
         order: 0,
         type: "hero",
-        title: "Welcome to PromoClip",
+        title: "Welcome to Subconscious Video Creator",
         content: JSON.stringify({
           headline: "Create Stunning Videos",
           subtext: "AI-powered promo video creation in minutes",
@@ -259,7 +259,7 @@ describe("agent workflow: voiceover generation", () => {
         projectId: "proj_test_123",
         sceneId: "scene_1",
         script:
-          "Welcome to PromoClip. Create stunning videos with the power of AI.",
+          "Welcome to Subconscious Video Creator. Create stunning videos with the power of AI.",
       },
     };
 

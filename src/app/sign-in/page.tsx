@@ -6,6 +6,7 @@ import { useConvexAuth, useMutation } from "convex/react";
 import { useRouter } from "next/navigation";
 import { api } from "../../../convex/_generated/api";
 import Link from "next/link";
+import SubconsciousLogo from "@/components/layout/SubconsciousLogo";
 import { loadDraft, clearDraft } from "@/components/onboarding/OnboardingWizard";
 
 export default function SignInPage() {
@@ -103,16 +104,8 @@ export default function SignInPage() {
         background: "radial-gradient(ellipse 60% 40% at 50% 0%, rgba(255,92,40,0.06), transparent 70%)",
       }} />
 
-      <Link href="/" className="flex items-center gap-2.5 mb-10 group">
-        <span
-          className="w-9 h-9 rounded-lg flex items-center justify-center text-white text-sm font-bold transition-transform group-hover:scale-105"
-          style={{ background: "var(--brand-orange)" }}
-        >
-          PC
-        </span>
-        <span className="text-xl font-semibold" style={{ color: "var(--foreground)" }}>
-          PromoClip
-        </span>
+      <Link href="/" className="flex items-center gap-2.5 mb-10 group transition-transform group-hover:scale-[1.02]">
+        <SubconsciousLogo size={36} textClass="text-xl" />
       </Link>
 
       <div

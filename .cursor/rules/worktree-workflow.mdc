@@ -1,0 +1,58 @@
+---
+description: Git worktree workflow — isolate every ticket/task in its own worktree, then merge back
+alwaysApply: true
+---
+
+# Git Worktree Workflow
+
+Every ticket, feature, bug fix, or task MUST be done in a dedicated git worktree. Never commit directly to `main`.
+
+## 1. Starting a Task
+
+When the user describes a ticket or task:
+
+1. Derive a short kebab-case branch name from the task (e.g. `fix-media-gallery-scroll`, `add-export-button`).
+2. Create the worktree **beside** the main repo:
+
+```bash
+cd /Users/ostepan/Desktop/subconscious/video-creator-demo
+git worktree add ../video-creator-demo-worktrees/<branch-name> -b <branch-name>
+```
+
+3. Do **all** file edits and shell commands inside the worktree path:
+   `/Users/ostepan/Desktop/subconscious/video-creator-demo-worktrees/<branch-name>/`
+4. Tell the user which worktree and branch you created.
+
+## 2. During Development
+
+- All reads, writes, and shell commands target the worktree directory, NOT the main repo.
+- Run tests (`npm test`) from the worktree directory.
+- Commit frequently with clear messages.
+
+## 3. Finishing & Merging
+
+Once the task is complete and tests pass:
+
+1. Ensure all changes are committed in the worktree.
+2. Switch back to the main repo and merge:
+
+```bash
+cd /Users/ostepan/Desktop/subconscious/video-creator-demo
+git merge <branch-name>
+```
+
+3. If merge conflicts occur, resolve them and tell the user what was conflicting.
+4. After a successful merge, clean up:
+
+```bash
+git worktree remove ../video-creator-demo-worktrees/<branch-name>
+git branch -d <branch-name>
+```
+
+5. Report the merge result to the user.
+
+## 4. If Merge Fails
+
+- Show the user the conflicting files and the conflict markers.
+- Ask the user how they want to resolve before proceeding.
+- Never force-push or discard the user's work.

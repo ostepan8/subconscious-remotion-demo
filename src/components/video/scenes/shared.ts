@@ -3,6 +3,34 @@ import type { VideoTheme, SceneStyleOverrides } from "@/types";
 import type { CSSProperties } from "react";
 
 // ---------------------------------------------------------------------------
+// Safe theme defaults — prevents crashes when theme/colors/fonts are missing
+// ---------------------------------------------------------------------------
+
+const DEFAULT_COLORS = {
+  background: "#0f0f14",
+  surface: "#1a1a24",
+  primary: "#6366f1",
+  secondary: "#8b5cf6",
+  text: "#f0f0f5",
+  textMuted: "#888",
+  accent: "#a78bfa",
+  glow: "#6366f1",
+} as const;
+
+const DEFAULT_FONTS = { heading: "system-ui", body: "system-ui" } as const;
+
+function safeTheme(theme: VideoTheme | null | undefined) {
+  const t = theme ?? ({} as Partial<VideoTheme>);
+  return {
+    colors: { ...DEFAULT_COLORS, ...t.colors },
+    fonts: { ...DEFAULT_FONTS, ...t.fonts },
+    borderRadius: t.borderRadius ?? 20,
+    personality: t.personality ?? {},
+    vibe: t.personality?.vibe as string | undefined,
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Easing presets
 // ---------------------------------------------------------------------------
 
@@ -197,16 +225,16 @@ export function animatedNumber(
 // ---------------------------------------------------------------------------
 
 export function meshGradientStyle(theme: VideoTheme): CSSProperties {
-  const vibe = theme.personality?.vibe;
+  const { colors, vibe } = safeTheme(theme);
   const base: CSSProperties = { position: "absolute", inset: 0 };
 
   if (vibe === "cyberpunk") {
     return {
       ...base,
       background: [
-        `radial-gradient(ellipse 70% 50% at 20% 30%, ${theme.colors.primary}35 0%, transparent 55%)`,
-        `radial-gradient(ellipse 50% 60% at 80% 70%, ${theme.colors.secondary}30 0%, transparent 50%)`,
-        `radial-gradient(ellipse 80% 30% at 50% 0%, ${theme.colors.accent}22 0%, transparent 45%)`,
+        `radial-gradient(ellipse 70% 50% at 20% 30%, ${colors.primary}35 0%, transparent 55%)`,
+        `radial-gradient(ellipse 50% 60% at 80% 70%, ${colors.secondary}30 0%, transparent 50%)`,
+        `radial-gradient(ellipse 80% 30% at 50% 0%, ${colors.accent}22 0%, transparent 45%)`,
       ].join(", "),
     };
   }
@@ -214,14 +242,14 @@ export function meshGradientStyle(theme: VideoTheme): CSSProperties {
   if (vibe === "minimal") {
     return {
       ...base,
-      background: `radial-gradient(ellipse 120% 80% at 50% 30%, ${theme.colors.primary}06 0%, transparent 70%)`,
+      background: `radial-gradient(ellipse 120% 80% at 50% 30%, ${colors.primary}06 0%, transparent 70%)`,
     };
   }
 
   if (vibe === "editorial") {
     return {
       ...base,
-      background: `radial-gradient(ellipse 100% 100% at 50% 50%, ${theme.colors.background} 40%, ${theme.colors.secondary}08 100%)`,
+      background: `radial-gradient(ellipse 100% 100% at 50% 50%, ${colors.background} 40%, ${colors.secondary}08 100%)`,
     };
   }
 
@@ -229,10 +257,10 @@ export function meshGradientStyle(theme: VideoTheme): CSSProperties {
     return {
       ...base,
       background: [
-        `radial-gradient(ellipse 60% 60% at 10% 20%, ${theme.colors.primary}30 0%, transparent 50%)`,
-        `radial-gradient(ellipse 50% 50% at 90% 80%, ${theme.colors.secondary}28 0%, transparent 45%)`,
-        `radial-gradient(ellipse 70% 40% at 50% 10%, ${theme.colors.accent}20 0%, transparent 50%)`,
-        `linear-gradient(135deg, transparent 40%, ${theme.colors.primary}08 50%, transparent 60%)`,
+        `radial-gradient(ellipse 60% 60% at 10% 20%, ${colors.primary}30 0%, transparent 50%)`,
+        `radial-gradient(ellipse 50% 50% at 90% 80%, ${colors.secondary}28 0%, transparent 45%)`,
+        `radial-gradient(ellipse 70% 40% at 50% 10%, ${colors.accent}20 0%, transparent 50%)`,
+        `linear-gradient(135deg, transparent 40%, ${colors.primary}08 50%, transparent 60%)`,
       ].join(", "),
     };
   }
@@ -240,26 +268,26 @@ export function meshGradientStyle(theme: VideoTheme): CSSProperties {
   if (vibe === "luxury") {
     return {
       ...base,
-      background: `radial-gradient(ellipse 90% 70% at 50% 40%, ${theme.colors.accent}0a 0%, transparent 60%)`,
+      background: `radial-gradient(ellipse 90% 70% at 50% 40%, ${colors.accent}0a 0%, transparent 60%)`,
     };
   }
 
   return {
     ...base,
     background: [
-      `radial-gradient(ellipse 80% 50% at 20% 30%, ${theme.colors.primary}25 0%, transparent 60%)`,
-      `radial-gradient(ellipse 60% 70% at 80% 70%, ${theme.colors.accent}20 0%, transparent 55%)`,
-      `radial-gradient(ellipse 90% 40% at 50% 0%, ${theme.colors.secondary}18 0%, transparent 50%)`,
+      `radial-gradient(ellipse 80% 50% at 20% 30%, ${colors.primary}25 0%, transparent 60%)`,
+      `radial-gradient(ellipse 60% 70% at 80% 70%, ${colors.accent}20 0%, transparent 55%)`,
+      `radial-gradient(ellipse 90% 40% at 50% 0%, ${colors.secondary}18 0%, transparent 50%)`,
     ].join(", "),
   };
 }
 
 export function gridPatternStyle(theme: VideoTheme): CSSProperties {
-  const vibe = theme.personality?.vibe;
+  const { colors, vibe } = safeTheme(theme);
   const base: CSSProperties = { position: "absolute", inset: 0 };
 
   if (vibe === "cyberpunk") {
-    const c = `${theme.colors.primary}18`;
+    const c = `${colors.primary}18`;
     return {
       ...base,
       backgroundImage: `linear-gradient(${c} 1px, transparent 1px), linear-gradient(90deg, ${c} 1px, transparent 1px)`,
@@ -268,7 +296,7 @@ export function gridPatternStyle(theme: VideoTheme): CSSProperties {
   }
 
   if (vibe === "minimal") {
-    const c = `${theme.colors.textMuted}08`;
+    const c = `${colors.textMuted}08`;
     return {
       ...base,
       backgroundImage: `radial-gradient(circle, ${c} 1px, transparent 1px)`,
@@ -281,8 +309,8 @@ export function gridPatternStyle(theme: VideoTheme): CSSProperties {
   }
 
   if (vibe === "energetic") {
-    const c1 = `${theme.colors.primary}10`;
-    const c2 = `${theme.colors.secondary}08`;
+    const c1 = `${colors.primary}10`;
+    const c2 = `${colors.secondary}08`;
     return {
       ...base,
       backgroundImage: `repeating-linear-gradient(
@@ -301,7 +329,7 @@ export function gridPatternStyle(theme: VideoTheme): CSSProperties {
     };
   }
 
-  const c = `${theme.colors.textMuted}12`;
+  const c = `${colors.textMuted}12`;
   return {
     ...base,
     backgroundImage: `linear-gradient(${c} 1px, transparent 1px), linear-gradient(90deg, ${c} 1px, transparent 1px)`,
@@ -324,12 +352,12 @@ export function noiseOverlayStyle(): CSSProperties {
 // ---------------------------------------------------------------------------
 
 export function glassSurface(theme: VideoTheme): CSSProperties {
-  const vibe = theme.personality?.vibe;
+  const { colors, vibe } = safeTheme(theme);
 
   if (vibe === "cyberpunk") {
-    const glow = theme.colors.glow || theme.colors.primary;
+    const glow = colors.glow || colors.primary;
     return {
-      background: `${theme.colors.surface}cc`,
+      background: `${colors.surface}cc`,
       backdropFilter: "blur(20px)",
       WebkitBackdropFilter: "blur(20px)",
       border: `1px solid ${glow}30`,
@@ -339,7 +367,7 @@ export function glassSurface(theme: VideoTheme): CSSProperties {
 
   if (vibe === "minimal") {
     return {
-      background: theme.colors.surface,
+      background: colors.surface,
       border: "1px solid rgba(0,0,0,0.06)",
       boxShadow: "0 1px 3px rgba(0,0,0,0.06), 0 8px 24px rgba(0,0,0,0.04)",
     };
@@ -348,23 +376,23 @@ export function glassSurface(theme: VideoTheme): CSSProperties {
   if (vibe === "editorial") {
     return {
       background: "transparent",
-      border: `1px solid ${theme.colors.primary}15`,
+      border: `1px solid ${colors.primary}15`,
       boxShadow: "none",
     };
   }
 
   if (vibe === "energetic") {
     return {
-      background: `${theme.colors.surface}ee`,
-      border: `2px solid ${theme.colors.primary}35`,
-      boxShadow: `0 4px 24px ${theme.colors.primary}15, 0 1px 2px rgba(0,0,0,0.2)`,
+      background: `${colors.surface}ee`,
+      border: `2px solid ${colors.primary}35`,
+      boxShadow: `0 4px 24px ${colors.primary}15, 0 1px 2px rgba(0,0,0,0.2)`,
     };
   }
 
   if (vibe === "luxury") {
     return {
-      background: theme.colors.surface,
-      border: `1px solid ${theme.colors.accent}25`,
+      background: colors.surface,
+      border: `1px solid ${colors.accent}25`,
       boxShadow: `0 4px 20px rgba(45,42,38,0.06), 0 1px 2px rgba(45,42,38,0.04)`,
     };
   }
@@ -372,8 +400,8 @@ export function glassSurface(theme: VideoTheme): CSSProperties {
   const isDark = isThemeDark(theme);
   return {
     background: isDark
-      ? `${theme.colors.surface}dd`
-      : `${theme.colors.surface}ee`,
+      ? `${colors.surface}dd`
+      : `${colors.surface}ee`,
     backdropFilter: "blur(24px)",
     WebkitBackdropFilter: "blur(24px)",
     border: `1px solid ${isDark ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.08)"}`,
@@ -384,7 +412,7 @@ export function glassSurface(theme: VideoTheme): CSSProperties {
 }
 
 export function glassCard(theme: VideoTheme, radius?: number): CSSProperties {
-  const r = radius ?? theme.borderRadius ?? 20;
+  const r = radius ?? safeTheme(theme).borderRadius;
   return {
     ...glassSurface(theme),
     borderRadius: r,
@@ -465,11 +493,11 @@ export function glowOrbStyle(
 // Multi-layer shadow
 // ---------------------------------------------------------------------------
 
-export function depthShadow(theme: VideoTheme): string {
-  const vibe = theme.personality?.vibe;
+export function depthShadow(theme?: VideoTheme): string {
+  const { colors, vibe } = safeTheme(theme);
 
   if (vibe === "cyberpunk") {
-    const glow = theme.colors.glow || theme.colors.primary;
+    const glow = colors.glow || colors.primary;
     return `0 0 15px ${glow}18, 0 4px 24px rgba(0,0,0,0.5), 0 16px 64px rgba(0,0,0,0.4)`;
   }
 
@@ -482,7 +510,7 @@ export function depthShadow(theme: VideoTheme): string {
   }
 
   if (vibe === "energetic") {
-    return `0 4px 16px ${theme.colors.primary}18, 0 12px 40px rgba(0,0,0,0.35), 0 32px 80px rgba(0,0,0,0.2)`;
+    return `0 4px 16px ${colors.primary}18, 0 12px 40px rgba(0,0,0,0.35), 0 32px 80px rgba(0,0,0,0.2)`;
   }
 
   if (vibe === "luxury") {
@@ -517,7 +545,10 @@ export const typography = {
   bodyLg: { fontSize: 26, fontWeight: 500, lineHeight: 1.5 } as CSSProperties,
   caption: { fontSize: 15, fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase" } as CSSProperties,
   stat: { fontSize: 72, fontWeight: 800, lineHeight: 1, letterSpacing: "-0.03em" } as CSSProperties,
+  label: { fontSize: 13, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase" } as CSSProperties,
 } as const;
+
+export const typo = typography;
 
 export function getTypography(theme?: VideoTheme) {
   const d = theme?.fonts?.heading
@@ -542,12 +573,12 @@ export function getTypography(theme?: VideoTheme) {
 // ---------------------------------------------------------------------------
 
 export function themedHeadlineStyle(theme: VideoTheme): CSSProperties {
-  const vibe = theme.personality?.vibe;
+  const { colors, vibe } = safeTheme(theme);
 
   if (vibe === "cyberpunk") {
-    const glow = theme.colors.glow || theme.colors.primary;
+    const glow = colors.glow || colors.primary;
     return {
-      backgroundImage: `linear-gradient(135deg, ${theme.colors.primary}, ${theme.colors.accent}, ${theme.colors.secondary})`,
+      backgroundImage: `linear-gradient(135deg, ${colors.primary}, ${colors.accent}, ${colors.secondary})`,
       backgroundClip: "text",
       WebkitBackgroundClip: "text",
       WebkitTextFillColor: "transparent",
@@ -557,19 +588,19 @@ export function themedHeadlineStyle(theme: VideoTheme): CSSProperties {
   }
 
   if (vibe === "minimal") {
-    return { color: theme.colors.text };
+    return { color: colors.text };
   }
 
   if (vibe === "editorial") {
     return {
-      color: theme.colors.text,
+      color: colors.text,
       fontStyle: "italic",
     };
   }
 
   if (vibe === "energetic") {
     return {
-      backgroundImage: `linear-gradient(135deg, ${theme.colors.primary}, ${theme.colors.secondary})`,
+      backgroundImage: `linear-gradient(135deg, ${colors.primary}, ${colors.secondary})`,
       backgroundClip: "text",
       WebkitBackgroundClip: "text",
       WebkitTextFillColor: "transparent",
@@ -578,10 +609,10 @@ export function themedHeadlineStyle(theme: VideoTheme): CSSProperties {
   }
 
   if (vibe === "luxury") {
-    return { color: theme.colors.primary };
+    return { color: colors.primary };
   }
 
-  return { color: theme.colors.text };
+  return { color: colors.text };
 }
 
 // ---------------------------------------------------------------------------
@@ -589,18 +620,18 @@ export function themedHeadlineStyle(theme: VideoTheme): CSSProperties {
 // ---------------------------------------------------------------------------
 
 export function themedButtonStyle(theme: VideoTheme): CSSProperties {
-  const vibe = theme.personality?.vibe;
+  const { colors, fonts, borderRadius, vibe } = safeTheme(theme);
 
   if (vibe === "cyberpunk") {
-    const glow = theme.colors.glow || theme.colors.primary;
+    const glow = colors.glow || colors.primary;
     return {
       padding: "16px 44px",
-      borderRadius: theme.borderRadius,
-      background: `linear-gradient(135deg, ${theme.colors.primary}, ${theme.colors.secondary})`,
+      borderRadius,
+      background: `linear-gradient(135deg, ${colors.primary}, ${colors.secondary})`,
       color: "#000",
       fontSize: 16,
       fontWeight: 700,
-      fontFamily: `"${theme.fonts.heading}", monospace`,
+      fontFamily: `"${fonts.heading}", monospace`,
       letterSpacing: "0.05em",
       textTransform: "uppercase" as const,
       boxShadow: `0 0 24px ${glow}40, 0 0 48px ${glow}20`,
@@ -611,8 +642,8 @@ export function themedButtonStyle(theme: VideoTheme): CSSProperties {
   if (vibe === "minimal") {
     return {
       padding: "16px 40px",
-      borderRadius: theme.borderRadius,
-      background: theme.colors.primary,
+      borderRadius,
+      background: colors.primary,
       color: "#fff",
       fontSize: 16,
       fontWeight: 600,
@@ -625,16 +656,16 @@ export function themedButtonStyle(theme: VideoTheme): CSSProperties {
       padding: "14px 0",
       borderRadius: 0,
       background: "transparent",
-      color: theme.colors.text,
+      color: colors.text,
       fontSize: 15,
       fontWeight: 600,
       letterSpacing: "0.12em",
       textTransform: "uppercase" as const,
-      borderBottom: `2px solid ${theme.colors.accent}`,
+      borderBottom: `2px solid ${colors.accent}`,
       border: "none",
       borderBottomWidth: 2,
       borderBottomStyle: "solid" as const,
-      borderBottomColor: theme.colors.accent,
+      borderBottomColor: colors.accent,
     };
   }
 
@@ -642,20 +673,20 @@ export function themedButtonStyle(theme: VideoTheme): CSSProperties {
     return {
       padding: "20px 52px",
       borderRadius: 999,
-      background: `linear-gradient(135deg, ${theme.colors.primary}, ${theme.colors.secondary})`,
+      background: `linear-gradient(135deg, ${colors.primary}, ${colors.secondary})`,
       color: "#000",
       fontSize: 18,
       fontWeight: 800,
       border: "none",
-      boxShadow: `0 4px 24px ${theme.colors.primary}35`,
+      boxShadow: `0 4px 24px ${colors.primary}35`,
     };
   }
 
   if (vibe === "luxury") {
     return {
       padding: "16px 44px",
-      borderRadius: theme.borderRadius,
-      background: theme.colors.primary,
+      borderRadius,
+      background: colors.primary,
       color: "#fff",
       fontSize: 15,
       fontWeight: 500,
@@ -667,8 +698,8 @@ export function themedButtonStyle(theme: VideoTheme): CSSProperties {
 
   return {
     padding: "17px 42px",
-    borderRadius: theme.borderRadius,
-    background: `linear-gradient(135deg, ${theme.colors.primary}, ${theme.colors.accent})`,
+    borderRadius,
+    background: `linear-gradient(135deg, ${colors.primary}, ${colors.accent})`,
     color: "#fff",
     fontSize: 18,
     fontWeight: 700,
@@ -680,11 +711,11 @@ export function themedButtonStyle(theme: VideoTheme): CSSProperties {
 // Helper: detect dark theme
 // ---------------------------------------------------------------------------
 
-export function isThemeDark(theme: VideoTheme): boolean {
-  const bg = theme.colors.background;
-  const r = parseInt(bg.slice(1, 3), 16);
-  const g = parseInt(bg.slice(3, 5), 16);
-  const b = parseInt(bg.slice(5, 7), 16);
+export function isThemeDark(theme?: VideoTheme): boolean {
+  const bg = safeTheme(theme).colors.background;
+  const r = parseInt(bg.slice(1, 3), 16) || 0;
+  const g = parseInt(bg.slice(3, 5), 16) || 0;
+  const b = parseInt(bg.slice(5, 7), 16) || 0;
   return (r * 299 + g * 587 + b * 114) / 1000 < 128;
 }
 
@@ -693,10 +724,11 @@ export function isThemeDark(theme: VideoTheme): boolean {
 // ---------------------------------------------------------------------------
 
 export function accentColor(theme: VideoTheme, index: number): string {
+  const { colors } = safeTheme(theme);
   const palette = [
-    theme.colors.primary,
-    theme.colors.accent,
-    theme.colors.secondary || theme.colors.primary,
+    colors.primary,
+    colors.accent,
+    colors.secondary || colors.primary,
   ];
   return palette[index % palette.length];
 }
@@ -823,7 +855,7 @@ export function animatedMeshBg(
   frame: number,
   theme: VideoTheme,
 ): CSSProperties {
-  const vibe = theme.personality?.vibe;
+  const { colors, vibe } = safeTheme(theme);
   const base: CSSProperties = { position: "absolute", inset: 0 };
 
   const x1 = interpolate(frame, [0, 120], [20, 35], {
@@ -847,9 +879,9 @@ export function animatedMeshBg(
     return {
       ...base,
       background: [
-        `radial-gradient(ellipse 70% 45% at ${x1}% ${y1}%, ${theme.colors.primary}38 0%, transparent 55%)`,
-        `radial-gradient(ellipse 55% 65% at ${x2}% ${y2}%, ${theme.colors.secondary}32 0%, transparent 50%)`,
-        `radial-gradient(ellipse 80% 30% at 50% 5%, ${theme.colors.accent}25 0%, transparent 45%)`,
+        `radial-gradient(ellipse 70% 45% at ${x1}% ${y1}%, ${colors.primary}38 0%, transparent 55%)`,
+        `radial-gradient(ellipse 55% 65% at ${x2}% ${y2}%, ${colors.secondary}32 0%, transparent 50%)`,
+        `radial-gradient(ellipse 80% 30% at 50% 5%, ${colors.accent}25 0%, transparent 45%)`,
       ].join(", "),
     };
   }
@@ -857,7 +889,7 @@ export function animatedMeshBg(
   if (vibe === "minimal") {
     return {
       ...base,
-      background: `radial-gradient(ellipse 100% 70% at ${x1 + 20}% ${y1}%, ${theme.colors.primary}05 0%, transparent 65%)`,
+      background: `radial-gradient(ellipse 100% 70% at ${x1 + 20}% ${y1}%, ${colors.primary}05 0%, transparent 65%)`,
     };
   }
 
@@ -873,9 +905,9 @@ export function animatedMeshBg(
     return {
       ...base,
       background: [
-        `radial-gradient(ellipse 60% 50% at ${x1 - 5}% ${y1 - 10}%, ${theme.colors.primary}35 0%, transparent 50%)`,
-        `radial-gradient(ellipse 50% 60% at ${x2 + 5}% ${y2 + 5}%, ${theme.colors.secondary}30 0%, transparent 45%)`,
-        `linear-gradient(${angle + 135}deg, transparent 30%, ${theme.colors.accent}0c 50%, transparent 70%)`,
+        `radial-gradient(ellipse 60% 50% at ${x1 - 5}% ${y1 - 10}%, ${colors.primary}35 0%, transparent 50%)`,
+        `radial-gradient(ellipse 50% 60% at ${x2 + 5}% ${y2 + 5}%, ${colors.secondary}30 0%, transparent 45%)`,
+        `linear-gradient(${angle + 135}deg, transparent 30%, ${colors.accent}0c 50%, transparent 70%)`,
       ].join(", "),
     };
   }
@@ -887,16 +919,16 @@ export function animatedMeshBg(
     });
     return {
       ...base,
-      background: `radial-gradient(ellipse 80% 60% at ${spotX}% 40%, ${theme.colors.accent}08 0%, transparent 60%)`,
+      background: `radial-gradient(ellipse 80% 60% at ${spotX}% 40%, ${colors.accent}08 0%, transparent 60%)`,
     };
   }
 
   return {
     ...base,
     background: [
-      `radial-gradient(ellipse 80% 50% at ${x1}% ${y1}%, ${theme.colors.primary}28 0%, transparent 60%)`,
-      `radial-gradient(ellipse 60% 70% at ${x2}% ${y2}%, ${theme.colors.accent}22 0%, transparent 55%)`,
-      `radial-gradient(ellipse 90% 40% at 50% 0%, ${theme.colors.secondary}18 0%, transparent 50%)`,
+      `radial-gradient(ellipse 80% 50% at ${x1}% ${y1}%, ${colors.primary}28 0%, transparent 60%)`,
+      `radial-gradient(ellipse 60% 70% at ${x2}% ${y2}%, ${colors.accent}22 0%, transparent 55%)`,
+      `radial-gradient(ellipse 90% 40% at 50% 0%, ${colors.secondary}18 0%, transparent 50%)`,
     ].join(", "),
   };
 }
