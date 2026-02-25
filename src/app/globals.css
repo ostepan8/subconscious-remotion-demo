@@ -1,0 +1,125 @@
+@import "tailwindcss";
+
+:root {
+  --brand-black: #101820;
+  --brand-orange: #ff5c28;
+  --brand-teal: #3ed0c3;
+  --brand-green: #b5e800;
+  --brand-cream: #f0f3ef;
+
+  --background: var(--brand-cream);
+  --foreground: var(--brand-black);
+  --surface: #ffffff;
+  --surface-hover: #f5f7f3;
+  --border: #d4d9cf;
+  --border-subtle: #e8ebe5;
+  --muted: #6b7b6e;
+}
+
+.dark {
+  --background: var(--brand-black);
+  --foreground: var(--brand-cream);
+  --surface: #1a2430;
+  --surface-hover: #243040;
+  --border: #2a3a4a;
+  --border-subtle: #1e2e3e;
+  --muted: #8a9a9e;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-geist-sans), system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes pulse-soft {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.6;
+  }
+}
+
+.animate-fade-in-up {
+  animation: fadeInUp 0.5s ease-out forwards;
+}
+
+.animate-pulse-soft {
+  animation: pulse-soft 2s ease-in-out infinite;
+}
+
+::selection {
+  background: var(--brand-orange);
+  color: white;
+}
+
+.template-card {
+  transition: border-color 0.15s, box-shadow 0.15s, transform 0.15s;
+}
+.template-card:hover {
+  border-color: var(--brand-orange) !important;
+  box-shadow: 0 4px 20px rgba(255, 92, 40, 0.1);
+  transform: translateY(-1px);
+}
+
+/* ── Premiere-style timeline ── */
+
+.premiere-scroll::-webkit-scrollbar {
+  height: 8px;
+}
+.premiere-scroll::-webkit-scrollbar-track {
+  background: #141428;
+}
+.premiere-scroll::-webkit-scrollbar-thumb {
+  background: #3a3a55;
+  border-radius: 4px;
+}
+.premiere-scroll::-webkit-scrollbar-thumb:hover {
+  background: #4a4a65;
+}
+
+.premiere-clip:hover {
+  filter: brightness(1.08);
+}
+
+.tl-btn:hover {
+  filter: brightness(1.25);
+}
+
+.tl-resize-handle:hover {
+  background: rgba(255, 92, 40, 0.5) !important;
+}
+
+.tl-ctx-item:hover {
+  background: #2a2a42 !important;
+}
+
+.tl-trim-handle:hover .tl-trim-handle-bar {
+  opacity: 1 !important;
+}
+
+.premiere-clip:hover .tl-trim-handle-bar {
+  opacity: 0.6 !important;
+}

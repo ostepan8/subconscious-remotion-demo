@@ -1,0 +1,31 @@
+---
+description: Run tests after every implementation change
+globs:
+alwaysApply: true
+---
+
+# Testing Requirements
+
+After every implementation (new feature, bug fix, refactor, or any code change):
+
+1. Run `npm test` (which runs `vitest run`) to execute the full test suite
+2. All existing tests must pass before considering the task complete
+3. If any tests fail, fix them before moving on
+4. If the implementation changes existing behavior, update the affected tests accordingly
+5. For new features, consider whether new tests should be added
+
+## Test Commands
+
+- Run all tests: `npm test`
+- Run a specific test file: `npx vitest run tests/path/to/file.test.ts`
+- Run tests in watch mode: `npx vitest`
+
+## Test Structure
+
+Tests live in the `tests/` directory:
+- `tests/unit/` — unit tests for utilities, helpers, configs
+- `tests/components/` — component tests
+- `tests/api/` — API route tests
+- `tests/backend/` — Convex backend logic tests
+- `tests/hooks/` — React hook tests
+- `tests/e2e/` — end-to-end workflow tests
