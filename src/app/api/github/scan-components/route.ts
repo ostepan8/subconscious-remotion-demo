@@ -544,10 +544,10 @@ export async function POST(req: NextRequest) {
               designStyle,
               designNotes,
               cssVariables: cssVars,
+              brandCandidateFiles: rankedBrandFiles.length > 0
+                ? rankedBrandFiles
+                : undefined,
             },
-            brandCandidateFiles: rankedBrandFiles.length > 0
-              ? rankedBrandFiles
-              : undefined,
           });
           send({
             type: "design_extracted",
