@@ -101,15 +101,26 @@ WRONG:   fadeInUp(frame, 0.5, 20)   ← 0.5 is not a valid frame number
 - MockupPlaceholder — component that renders a placeholder box
 
 ### Theme object shape (passed as prop)
-theme.colors: { background, surface, primary, secondary, text, textMuted, accent }
-theme.fonts: { heading, body }
-theme.borderRadius: number
-IMPORTANT: The theme object has ONLY these properties. There is NO theme.brandColors, NO theme.foreground,
-NO theme.palette, NO theme.brand. If you need colors, use theme.colors.primary, theme.colors.background, etc.
+The theme prop is an object with this EXACT structure:
+  theme.colors.background  — string (hex, e.g. "#0a0a1f") — page background
+  theme.colors.surface     — string (hex) — card/panel background
+  theme.colors.primary     — string (hex) — primary brand color
+  theme.colors.secondary   — string (hex) — secondary accent
+  theme.colors.text        — string (hex) — main text / foreground color
+  theme.colors.textMuted   — string (hex) — muted/secondary text color
+  theme.colors.accent      — string (hex) — accent highlight color
+  theme.fonts.heading      — string — heading font family
+  theme.fonts.body         — string — body font family
+  theme.borderRadius       — number — default border radius
+
+IMPORTANT: The theme object has ONLY these properties listed above.
+There is NO theme.brandColors, NO theme.foreground, NO theme.palette, NO theme.brand.
 WRONG: theme.brandColors.foreground  ← brandColors does NOT exist, will crash
 WRONG: theme.foreground              ← does NOT exist
+WRONG: theme.palette.primary         ← does NOT exist
 CORRECT: theme.colors.text           ← use this for text/foreground color
 CORRECT: theme.colors.background     ← use this for background color
+CORRECT: theme.colors.textMuted      ← use this for muted/gray text
 
 ### Content object shape (passed as prop)
 content: { headline, subtext, buttonText, bullets, features, steps, stats, questions, items, cells, milestones, members, reviews, logos, before, after, quote, author, price, date, rating, reviewCount, mediaUrl, layout }

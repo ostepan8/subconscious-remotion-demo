@@ -48,6 +48,9 @@ useCurrentFrame(), useVideoConfig(), interpolate(value, inputRange, outputRange,
 fadeInBlur(frame, delay, dur?), fadeInUp(frame, delay, distance?, dur?), scaleIn(frame, delay, dur?), slideFromLeft(frame, delay, distance?, dur?), slideFromRight(frame, delay, distance?, dur?), glowPulse(frame, delay, color), revealLine(frame, delay, dur?), counterSpinUp(frame, delay, target, dur?), floatY(frame, amplitude?, speed?, phase?), breathe(frame, speed?, amount?, phase?)
 - staggerEntrance(frame, index, baseDelay, spacing?) — auto-picks a different animation per index
 - counterSpinUp returns a RAW FLOAT — you MUST format it: Math.round(counterSpinUp(frame, delay, 4300)) or counterSpinUp(frame, delay, 99.9).toFixed(1)
+- typewriterReveal(frame, delay, totalChars, dur?) — ⚠️ RETURNS AN OBJECT { visibleChars: number, showCursor: boolean }, NOT a string!
+  CORRECT: const tw = typewriterReveal(frame, 10, myText.length); then render myText.slice(0, tw.visibleChars)
+  WRONG: rendering typewriterReveal(...) directly — it's an object, React will crash!
 
 ### Background helpers — RETURN CSSProperties OBJECTS, use with spread syntax
 - animatedMeshBg(frame, theme) → style object with animated radial gradients. Use: React.createElement('div', { style: animatedMeshBg(frame, theme) })
@@ -107,7 +110,14 @@ const SUBAGENT_SYSTEM_PROMPT = `You are a Remotion scene builder creating produc
 - Large, readable typography: heroTitle for main text, sectionTitle for section headers
 - Animate numbers with counterSpinUp — ALWAYS wrap with Math.round() or .toFixed(). Example: Math.round(counterSpinUp(frame, 10, 4300)) displays "4300", not "4299.588692657". For percentages use .toFixed(1). Never show raw floats.
 - Format large numbers with toLocaleString() after rounding for commas (e.g. "12,000+")
-- Animate text with typewriterReveal
+- Animate text with typewriterReveal — ⚠️ READ CAREFULLY:
+  typewriterReveal(frame, delay, totalChars) returns an OBJECT { visibleChars, showCursor }, NOT a string.
+  CORRECT usage:
+    const title = 'Hello World';
+    const tw = typewriterReveal(frame, 10, title.length);
+    React.createElement('span', null, title.slice(0, tw.visibleChars))
+  WRONG (will crash): React.createElement('span', null, typewriterReveal(frame, 10, 11))
+  WRONG (will crash): const text = typewriterReveal(frame, 10, 'Hello'.length);  then rendering {text}
 
 ## Architecture Pattern
 \`\`\`
@@ -123,7 +133,22 @@ ${COMPONENT_API_REF}
 ## Workflow
 1. Call write_code with your COMPLETE component (one call, full code)
 2. Call finalize_component to validate
-3. If errors, call edit_code to fix, then finalize_component again`;
+3. If finalize_component returns success=false, you MUST fix it:
+   - Read the error message carefully
+   - Call edit_code to fix the specific issue (find the broken code, replace with correct code)
+   - Call finalize_component again
+   - Repeat until success=true or you've tried 3 times
+
+## CRITICAL: typewriterReveal Example (MUST follow this pattern)
+\`\`\`
+const title = 'Resumes Tailored';
+const tw = typewriterReveal(frame, 15, title.length);
+// Render the SLICED STRING, not the tw object:
+React.createElement('h1', { style: headingStyle }, title.slice(0, tw.visibleChars))
+// Optional blinking cursor:
+tw.showCursor ? React.createElement('span', { style: cursorStyle }, '|') : null
+\`\`\`
+NEVER do: React.createElement('span', null, typewriterReveal(frame, 15, 18))  ← CRASHES (object as child)`;
 
 // ---------------------------------------------------------------------------
 // Build tools — just write_code, edit_code, finalize_component

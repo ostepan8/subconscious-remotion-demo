@@ -830,6 +830,24 @@ const getTypography = (theme?: any) => {
 
 var typo = typography;
 
+// Ensure theme always has all expected properties with defaults
+function __safeTheme(t: any) {
+  if (!t || typeof t !== 'object') t = {};
+  var defaultColors = {
+    background: '#0f0f17', surface: '#1a1a2e', primary: '#61dafb',
+    secondary: '#a78bfa', text: '#f0f0f5', textMuted: '#888',
+    accent: '#f97316', glow: '#6366f1',
+  };
+  var defaultFonts = { heading: 'system-ui, sans-serif', body: 'system-ui, sans-serif' };
+  return {
+    ...t,
+    colors: { ...defaultColors, ...(t.colors || {}) },
+    fonts: { ...defaultFonts, ...(t.fonts || {}) },
+    borderRadius: t.borderRadius ?? 20,
+    personality: t.personality ?? {},
+  };
+}
+
 const MockupPlaceholder = (p: any) =>
   React.createElement('div', {
     style: { background: '#1a1a2e', borderRadius: 12, border: '1px solid rgba(255,255,255,0.1)',
@@ -905,13 +923,14 @@ ${cleaned}
     : typeof ${componentName} !== 'undefined' ? ${componentName}
     : null;
 
-  // 5. Build props
+  // 5. Build props (apply safeTheme to ensure all colors/fonts exist)
   var __props = { ${propsEntries} };
   for (var k in __props) {
     if (__props.hasOwnProperty(k) && typeof __props[k] === 'string') {
       try { __props[k] = JSON.parse(__props[k]); } catch(e) {}
     }
   }
+  if (__props.theme) { __props.theme = __safeTheme(__props.theme); }
 
   // 6. Error boundary class (plain JS)
   var __hasCaughtError = false;

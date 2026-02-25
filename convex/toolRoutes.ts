@@ -884,23 +884,42 @@ export const finalizeComponent = httpAction(async (ctx, request) => {
     const validation = validateComponentCode(buffer);
 
     if (!validation.valid) {
-      await ctx.runMutation(api.scenes.updateScene, {
-        sceneId,
-        content: {
-          ...existingContent,
-          generationStatus: "error",
-          generationError: `Validation failed: ${validation.error}`,
-        },
-      });
+      const attempts = (typeof existingContent.validationAttempts === "number"
+        ? existingContent.validationAttempts
+        : 0) + 1;
+      const maxAttempts = 3;
+
+      if (attempts >= maxAttempts) {
+        await ctx.runMutation(api.scenes.updateScene, {
+          sceneId,
+          content: {
+            ...existingContent,
+            generationStatus: "error",
+            generationError: `Validation failed after ${attempts} attempts: ${validation.error}`,
+            validationAttempts: attempts,
+          },
+        });
+      } else {
+        await ctx.runMutation(api.scenes.updateScene, {
+          sceneId,
+          content: {
+            ...existingContent,
+            validationAttempts: attempts,
+            codeBuffer: validation.fixedCode,
+          },
+        });
+      }
       return json({
         success: false,
         error: validation.error,
         undefinedRefs: validation.undefinedRefs,
+        attempt: attempts,
+        maxAttempts,
         bufferPreview: buffer.slice(0, 500),
         message:
-          "Validation failed. Use edit_code to fix the issue, " +
-          "or write_code with startLine=0 endLine=<totalLines> " +
-          "to rewrite. Error: " + validation.error,
+          `Validation failed (attempt ${attempts}/${maxAttempts}). ` +
+          "Use edit_code to fix the issue, then call finalize_component again. " +
+          "Error: " + validation.error,
       });
     }
 
