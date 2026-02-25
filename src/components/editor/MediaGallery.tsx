@@ -2858,6 +2858,8 @@ function ComponentLivePreview({
     name: string;
     code: string;
     description: string;
+    sourceType?: "scene" | "custom";
+    sourceId?: string;
   };
   themeId: string;
   onClose: () => void;
@@ -3075,7 +3077,25 @@ function ComponentLivePreview({
       };
       setChatMessages((prev) => [...prev, assistantMsg]);
 
+      const activityLog: string[] = [];
+      const appendActivity = (line: string) => {
+        activityLog.push(line);
+        setChatMessages((prev) => {
+          const updated = [...prev];
+          updated[updated.length - 1] = {
+            role: "assistant",
+            content: activityLog.join("\n"),
+          };
+          return updated;
+        });
+      };
+
       try {
+        const sceneId =
+          component.sourceType === "scene"
+            ? component.sourceId
+            : undefined;
+
         const res = await fetch("/api/component/edit", {
           method: "POST",
           headers: {
@@ -3085,6 +3105,7 @@ function ComponentLivePreview({
             code: liveCode,
             instruction: msgText,
             history: chatMessages,
+            sceneId,
           }),
         });
 
@@ -3111,14 +3132,35 @@ function ComponentLivePreview({
 
             try {
               const event = JSON.parse(payload);
-              if (event.type === "status") {
+
+              if (event.type === "tool_call") {
+                const toolName = event.tool || "unknown";
+                const msg = event.message || `Using ${toolName}...`;
+                appendActivity(`[Agent] ${msg}`);
+              } else if (event.type === "code_update") {
+                if (event.code) {
+                  setLiveCode(event.code);
+                  setPreviewKey((k) => k + 1);
+                }
+              } else if (event.type === "validation") {
+                if (event.valid) {
+                  appendActivity("[Agent] Validation passed.");
+                } else {
+                  appendActivity(
+                    `[Agent] Validation error: ${event.error || "unknown"}`,
+                  );
+                }
+              } else if (event.type === "status") {
+                appendActivity(
+                  `[Agent] ${event.message || "Working..."}`,
+                );
+              } else if (event.type === "delta") {
                 setChatMessages((prev) => {
                   const updated = [...prev];
+                  const last = updated[updated.length - 1];
                   updated[updated.length - 1] = {
                     role: "assistant",
-                    content:
-                      event.message ||
-                      "Validating...",
+                    content: last.content + event.content,
                   };
                   return updated;
                 });
@@ -3132,12 +3174,17 @@ function ComponentLivePreview({
                 justEditedRef.current = true;
                 setPreviewKey((k) => k + 1);
 
-                onSaveCode(event.code).then(() => {
-                  setDirty(false);
-                }).catch((err) => {
-                  console.error("Auto-save after edit failed:", err);
-                  setDirty(true);
-                });
+                onSaveCode(event.code)
+                  .then(() => {
+                    setDirty(false);
+                  })
+                  .catch((err) => {
+                    console.error(
+                      "Auto-save after edit failed:",
+                      err,
+                    );
+                    setDirty(true);
+                  });
 
                 let explanation =
                   event.explanation ||
@@ -3146,27 +3193,34 @@ function ComponentLivePreview({
                   explanation +=
                     "\n\n⚠️ Validation issue detected — check preview for runtime errors.";
                 }
-
                 explanation +=
                   "\n\n✅ Saved & recompiling preview...";
 
-                setChatMessages((prev) => {
-                  const updated = [...prev];
-                  updated[updated.length - 1] = {
-                    role: "assistant",
-                    content: explanation,
-                  };
-                  return updated;
-                });
+                if (activityLog.length > 0) {
+                  activityLog.push("");
+                  activityLog.push(explanation);
+                  setChatMessages((prev) => {
+                    const updated = [...prev];
+                    updated[updated.length - 1] = {
+                      role: "assistant",
+                      content: activityLog.join("\n"),
+                    };
+                    return updated;
+                  });
+                } else {
+                  setChatMessages((prev) => {
+                    const updated = [...prev];
+                    updated[updated.length - 1] = {
+                      role: "assistant",
+                      content: explanation,
+                    };
+                    return updated;
+                  });
+                }
               } else if (event.type === "error") {
-                setChatMessages((prev) => {
-                  const updated = [...prev];
-                  updated[updated.length - 1] = {
-                    role: "assistant",
-                    content: `Error: ${event.message}`,
-                  };
-                  return updated;
-                });
+                appendActivity(
+                  `[Error] ${event.message}`,
+                );
               }
             } catch {
               /* skip malformed */
@@ -3186,7 +3240,7 @@ function ComponentLivePreview({
         setIsStreaming(false);
       }
     },
-    [isStreaming, liveCode, chatMessages, onSaveCode],
+    [isStreaming, liveCode, chatMessages, onSaveCode, component.sourceType, component.sourceId],
   );
 
   sendChatMessageRef.current = sendChatMessage;

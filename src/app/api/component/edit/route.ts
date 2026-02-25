@@ -1,111 +1,177 @@
 import { Subconscious } from "subconscious";
+import { ConvexHttpClient } from "convex/browser";
 import { NextRequest } from "next/server";
 import { COMPONENT_API_REFERENCE } from "@/lib/component-api-reference";
 import { validateComponent } from "@/lib/validate-component";
-const SUBCONSCIOUS_CODING_ENGINE = "tim-gpt";
+import { api } from "../../../../../convex/_generated/api";
+import type { Id } from "../../../../../convex/_generated/dataModel";
 
-const COMPONENT_EDITOR_PROMPT = `You are a precise React/Remotion component code editor.
-You receive the current component source code and a user instruction, then return the COMPLETE modified code.
+const SUBCONSCIOUS_CODING_ENGINE = "tim-gpt-heavy";
+
+const AGENTIC_EDITOR_PROMPT = `You are a precise React/Remotion code editor that makes TARGETED edits.
+You modify components by reading the current code, then making focused find-and-replace edits.
 
 ${COMPONENT_API_REFERENCE}
 
-## Output format
-1. Return the FULL modified component code inside a single \`\`\`tsx code fence.
-2. No partial patches — always the complete function from start to finish.
-3. After the code fence, write a 1-sentence explanation of what you changed.
-4. If the user asks something unclear, make your best creative interpretation.
+## Workflow
+1. Call read_code to see the current component source
+2. Plan your changes — identify EXACTLY what needs to change
+3. Call edit_code for each change — use EXACT text from read_code as old_text
+4. Call finalize to validate your changes compile
+5. If finalize reports errors, call read_code again, then edit_code to fix, then finalize again
 
-## Example of correct output:
-\`\`\`tsx
-function GeneratedComponent({ content, theme }) {
-  const frame = useCurrentFrame();
-  const typo = getTypography(theme);
+## Rules
+- Make the SMALLEST changes needed. Do NOT rewrite the entire file.
+- old_text in edit_code must be an EXACT substring of the current code (copy from read_code output)
+- If you need to add new code, use edit_code: set old_text to the line BEFORE where you want to insert, and new_text to that line + your new code
+- If you need to remove code, set new_text to empty string
+- counterSpinUp() returns a raw float — always wrap: Math.round(counterSpinUp(...))
+- depthShadow() returns a string — use as boxShadow: depthShadow(), never spread
+- Use React.createElement() for all elements (no JSX)
+- Use integer frame numbers for animation delays
 
-  return (
-    <AbsoluteFill style={{ background: theme.colors.background }}>
-      <div style={{ ...fadeInUp(frame, 0), padding: spacing.scenePadding }}>
-        <h1 style={{ ...typo.heroTitle, color: theme.colors.text }}>
-          {content.headline}
-        </h1>
-      </div>
-    </AbsoluteFill>
-  );
+## Example
+If the code has:
+  color: '#ff0000'
+And the user says "make it blue", call:
+  edit_code({ old_text: "color: '#ff0000'", new_text: "color: '#0088ff'" })
+Then call finalize to validate.`;
+
+function buildEditorTools(
+  convexSiteUrl: string,
+  sceneId: string,
+  toolSecret: string,
+) {
+  const s = `?secret=${toolSecret}`;
+  return [
+    {
+      type: "function" as const,
+      name: "read_code",
+      description:
+        "Read the current component code. Returns the full source with line numbers. Always call this first to see what you're working with.",
+      url: `${convexSiteUrl}/tools/read-buffer${s}`,
+      method: "POST" as const,
+      timeout: 10,
+      parameters: {
+        type: "object" as const,
+        properties: {
+          sceneId: { type: "string" as const, description: "Scene ID" },
+          startLine: {
+            type: "integer" as const,
+            description: "Start line (0-indexed, default 0)",
+          },
+          numLines: {
+            type: "integer" as const,
+            description: "Number of lines to read (default 999 = all)",
+          },
+        },
+        required: [] as string[],
+        additionalProperties: false,
+      },
+      defaults: { sceneId, startLine: 0, numLines: 999 },
+    },
+    {
+      type: "function" as const,
+      name: "edit_code",
+      description:
+        "Find and replace text in the code. old_text must be an EXACT substring of the current code. Returns success/failure and updated line count.",
+      url: `${convexSiteUrl}/tools/edit-code${s}`,
+      method: "POST" as const,
+      timeout: 10,
+      parameters: {
+        type: "object" as const,
+        properties: {
+          sceneId: { type: "string" as const, description: "Scene ID" },
+          oldString: {
+            type: "string" as const,
+            description: "Exact text to find in the current code",
+          },
+          newString: {
+            type: "string" as const,
+            description: "Replacement text",
+          },
+        },
+        required: ["oldString", "newString"],
+        additionalProperties: false,
+      },
+      defaults: { sceneId },
+    },
+    {
+      type: "function" as const,
+      name: "write_code",
+      description:
+        "Replace the ENTIRE code buffer. Only use this if asked to rewrite the whole component, or if the code is very small. Prefer edit_code for targeted changes.",
+      url: `${convexSiteUrl}/tools/write-code${s}`,
+      method: "POST" as const,
+      timeout: 10,
+      parameters: {
+        type: "object" as const,
+        properties: {
+          sceneId: { type: "string" as const, description: "Scene ID" },
+          code: {
+            type: "string" as const,
+            description: "Complete component code",
+          },
+        },
+        required: ["code"],
+        additionalProperties: false,
+      },
+      defaults: { sceneId },
+    },
+    {
+      type: "function" as const,
+      name: "finalize",
+      description:
+        "Validate the current code. Returns success or compilation errors. Call this after making all edits to check they compile. If errors are returned, fix them with edit_code and call finalize again.",
+      url: `${convexSiteUrl}/tools/finalize-component${s}`,
+      method: "POST" as const,
+      timeout: 10,
+      parameters: {
+        type: "object" as const,
+        properties: {
+          sceneId: { type: "string" as const, description: "Scene ID" },
+        },
+        required: [] as string[],
+        additionalProperties: false,
+      },
+      defaults: { sceneId },
+    },
+  ];
 }
-\`\`\`
-Made the heading use the hero title typography.`;
 
-/**
- * Validates by compiling TSX → JS with sucrase (same transform the
- * preview iframe does with Babel) then checking the compiled JS.
- */
-function validateCodeLocally(code: string) {
-  return validateComponent(code);
+function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
-
-function extractCodeFromAnswer(answer: string): {
-  code: string | null;
-  explanation: string;
-} {
-  const codeMatch = answer.match(
-    /```(?:tsx|typescript|jsx|javascript)?\s*\n([\s\S]*?)```/,
-  );
-  const code = codeMatch ? codeMatch[1].trim() : null;
-  const explanationMatch = answer.match(
-    /```[\s\S]*?```\s*\n*([\s\S]*)/,
-  );
-  const explanation = explanationMatch
-    ? explanationMatch[1].trim()
-    : "Changes applied.";
-  return { code, explanation };
-}
-
-function parseAnswerFromStream(fullContent: string): string {
-  try {
-    const parsed = JSON.parse(fullContent);
-    return typeof parsed.answer === "string"
-      ? parsed.answer
-      : JSON.stringify(parsed.answer);
-  } catch {
-    const answerMatch = fullContent.match(
-      /"answer"\s*:\s*"((?:[^"\\]|\\.)*)"/,
-    );
-    if (answerMatch) {
-      return answerMatch[1]
-        .replace(/\\n/g, "\n")
-        .replace(/\\"/g, '"')
-        .replace(/\\\\/g, "\\");
-    }
-    return fullContent;
-  }
-}
-
-const MAX_VALIDATION_RETRIES = 2;
 
 export async function POST(req: NextRequest) {
-  const { code, instruction, history } = (await req.json()) as {
+  const { code, instruction, history, sceneId } = (await req.json()) as {
     code: string;
     instruction: string;
     history?: { role: string; content: string }[];
+    sceneId?: string;
   };
 
   const subconsciousApiKey = process.env.SUBCONSCIOUS_API_KEY;
-  if (!subconsciousApiKey) {
+  const convexUrl = process.env.NEXT_PUBLIC_CONVEX_URL;
+  const convexSiteUrl =
+    process.env.NEXT_PUBLIC_CONVEX_SITE_URL ||
+    convexUrl?.replace(".cloud", ".site");
+  const toolSecret = process.env.TOOL_ENDPOINT_SECRET || "";
+
+  if (!subconsciousApiKey || !convexUrl || !convexSiteUrl) {
     return new Response(
-      JSON.stringify({ error: "Missing SUBCONSCIOUS_API_KEY" }),
+      JSON.stringify({ error: "Missing server configuration" }),
       { status: 500, headers: { "Content-Type": "application/json" } },
     );
   }
 
-  const conversationHistory = (history || [])
-    .slice(-10)
-    .map(
-      (m) =>
-        `${m.role === "user" ? "User" : "Assistant"}: ${m.content}`,
-    )
-    .join("\n\n");
+  if (!sceneId) {
+    return fallbackNonAgentic(code, instruction, history, subconsciousApiKey);
+  }
 
-  const encoder = new TextEncoder();
+  const convex = new ConvexHttpClient(convexUrl);
   const client = new Subconscious({ apiKey: subconsciousApiKey });
+  const encoder = new TextEncoder();
 
   const readable = new ReadableStream({
     async start(controller) {
@@ -116,155 +182,194 @@ export async function POST(req: NextRequest) {
       };
 
       try {
-        let currentCode = code;
-        let lastError: string | null = null;
-        let finalCode: string | null = null;
-        let finalExplanation = "Changes applied.";
+        const scene = await convex.query(api.scenes.getScene, {
+          sceneId: sceneId as Id<"scenes">,
+        });
+        if (!scene) {
+          emit({ type: "error", message: "Scene not found" });
+          controller.enqueue(encoder.encode("data: [DONE]\n\n"));
+          controller.close();
+          return;
+        }
 
-        for (
-          let attempt = 0;
-          attempt <= MAX_VALIDATION_RETRIES;
-          attempt++
-        ) {
-          const isRetry = attempt > 0;
+        const existingContent =
+          (scene.content as Record<string, unknown>) || {};
+        await convex.mutation(api.scenes.updateScene, {
+          sceneId: sceneId as Id<"scenes">,
+          content: {
+            ...existingContent,
+            codeBuffer: code,
+            generationStatus: "editing",
+          },
+        });
 
-          let prompt: string;
-          if (isRetry && lastError) {
-            prompt = `${COMPONENT_EDITOR_PROMPT}
+        emit({
+          type: "tool_call",
+          tool: "init",
+          message: "Initializing editor agent...",
+        });
 
-## Current Component Code
-\`\`\`tsx
-${currentCode}
-\`\`\`
+        const conversationHistory = (history || [])
+          .slice(-6)
+          .map(
+            (m) =>
+              `${m.role === "user" ? "User" : "Assistant"}: ${m.content}`,
+          )
+          .join("\n\n");
 
-## COMPILATION FAILED — FIX REQUIRED (attempt ${attempt + 1}/${MAX_VALIDATION_RETRIES + 1})
-The previous code you generated failed validation with this error:
-\`\`\`
-${lastError}
-\`\`\`
-
-Fix the error. Remember:
-- Only use functions from the AVAILABLE API above
-- Do NOT invent new functions
-- depthShadow() returns a string, don't spread it
-- getTypography(theme) returns the object directly, don't destructure
-- Use integer frame numbers for delays, not floats
-
-Return the COMPLETE fixed code in a \`\`\`tsx fence.`;
-          } else {
-            prompt = `${COMPONENT_EDITOR_PROMPT}
-
-## Current Component Code
-\`\`\`tsx
-${code}
-\`\`\`
+        const prompt = `${AGENTIC_EDITOR_PROMPT}
 
 ${conversationHistory ? `## Conversation History\n${conversationHistory}\n` : ""}
 ## User Instruction
-${instruction}`;
-          }
+${instruction}
 
-          if (isRetry) {
-            emit({
-              type: "status",
-              message: `Validation failed, auto-fixing (attempt ${attempt + 1})...`,
+Start by calling read_code, then make your edits, then finalize.`;
+
+        const tools = buildEditorTools(
+          convexSiteUrl,
+          sceneId,
+          toolSecret,
+        );
+
+        const run = await client.run({
+          engine: SUBCONSCIOUS_CODING_ENGINE,
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          input: { instructions: prompt, tools: tools as any },
+        });
+
+        const runId = run.runId;
+        if (!runId) {
+          emit({ type: "error", message: "Failed to start agent run" });
+          controller.enqueue(encoder.encode("data: [DONE]\n\n"));
+          controller.close();
+          return;
+        }
+
+        emit({ type: "tool_call", tool: "agent", message: "Agent is working..." });
+
+        let lastBuffer = code;
+        let editCount = 0;
+        const maxPolls = 120;
+
+        for (let i = 0; i < maxPolls; i++) {
+          await sleep(1500);
+
+          try {
+            const currentScene = await convex.query(api.scenes.getScene, {
+              sceneId: sceneId as Id<"scenes">,
             });
-          }
+            const currentContent =
+              (currentScene?.content as Record<string, unknown>) || {};
+            const currentBuffer =
+              typeof currentContent.codeBuffer === "string"
+                ? currentContent.codeBuffer
+                : "";
 
-          const stream = client.stream({
-            engine: SUBCONSCIOUS_CODING_ENGINE,
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            input: { instructions: prompt, tools: [] as any },
-          });
-
-          let fullContent = "";
-          let answer = "";
-
-          for await (const event of stream) {
-            if (event.type === "delta") {
-              fullContent += event.content;
-              if (!isRetry) {
-                emit({ type: "delta", content: event.content });
-              }
-            } else if (event.type === "done") {
-              answer = parseAnswerFromStream(fullContent);
-            } else if (event.type === "error") {
+            if (currentBuffer && currentBuffer !== lastBuffer) {
+              editCount++;
+              const oldSnippet = summarizeDiff(lastBuffer, currentBuffer);
               emit({
-                type: "error",
-                message: event.message || "Unknown error",
+                type: "tool_call",
+                tool: "edit_code",
+                message: `Edit #${editCount}: ${oldSnippet}`,
               });
-              controller.enqueue(
-                encoder.encode("data: [DONE]\n\n"),
-              );
+              emit({ type: "code_update", code: currentBuffer });
+              lastBuffer = currentBuffer;
+            }
+
+            if (
+              currentContent.generationStatus === "ready" &&
+              currentContent.generatedCode
+            ) {
+              const finalCode = String(currentContent.generatedCode);
+              emit({
+                type: "done",
+                code: finalCode,
+                explanation: `Applied ${editCount} edit${editCount !== 1 ? "s" : ""} successfully.`,
+                validated: true,
+              });
+              controller.enqueue(encoder.encode("data: [DONE]\n\n"));
               controller.close();
               return;
             }
+          } catch {
+            // Convex poll failed, continue
           }
 
-          if (!answer) {
-            emit({ type: "error", message: "No response from AI" });
-            controller.enqueue(
-              encoder.encode("data: [DONE]\n\n"),
-            );
-            controller.close();
-            return;
-          }
+          try {
+            const status = await client.get(runId);
+            if (
+              status.status === "succeeded" ||
+              status.status === "failed" ||
+              status.status === "canceled" ||
+              status.status === "timed_out"
+            ) {
+              const finalScene = await convex.query(api.scenes.getScene, {
+                sceneId: sceneId as Id<"scenes">,
+              });
+              const finalContent =
+                (finalScene?.content as Record<string, unknown>) || {};
+              const finalBuffer =
+                typeof finalContent.generatedCode === "string"
+                  ? finalContent.generatedCode
+                  : typeof finalContent.codeBuffer === "string"
+                    ? finalContent.codeBuffer
+                    : lastBuffer;
 
-          const { code: extractedCode, explanation } =
-            extractCodeFromAnswer(answer);
+              if (finalBuffer !== lastBuffer) {
+                emit({ type: "code_update", code: finalBuffer });
+              }
 
-          if (!extractedCode) {
-            emit({
-              type: "error",
-              message: "AI did not return code in a ```tsx fence.",
-            });
-            controller.enqueue(
-              encoder.encode("data: [DONE]\n\n"),
-            );
-            controller.close();
-            return;
-          }
+              if (status.status === "succeeded") {
+                const validation = validateComponent(finalBuffer);
+                emit({
+                  type: "validation",
+                  valid: validation.valid,
+                  error: validation.error || undefined,
+                });
 
-          const validation = validateCodeLocally(extractedCode);
+                emit({
+                  type: "done",
+                  code: validation.fixedCode || finalBuffer,
+                  explanation:
+                    status.result?.answer ||
+                    `Applied ${editCount} edit${editCount !== 1 ? "s" : ""}.`,
+                  validated: validation.valid,
+                  validationError: validation.error || undefined,
+                });
+              } else {
+                emit({
+                  type: "done",
+                  code: finalBuffer,
+                  explanation: `Agent ${status.status}. ${editCount} edit${editCount !== 1 ? "s" : ""} were applied.`,
+                  validated: false,
+                  validationError: `Run ${status.status}`,
+                });
+              }
 
-          if (validation.valid) {
-            finalCode = validation.fixedCode;
-            finalExplanation = explanation;
-            break;
-          } else {
-            lastError = validation.error || "Unknown validation error";
-            currentCode = extractedCode;
-
-            if (attempt === MAX_VALIDATION_RETRIES) {
-              finalCode = validation.fixedCode;
-              finalExplanation =
-                `${explanation}\n\n⚠️ Warning: code may have issues — ${lastError}`;
-              break;
+              controller.enqueue(encoder.encode("data: [DONE]\n\n"));
+              controller.close();
+              return;
             }
+          } catch {
+            // Status poll failed, continue
           }
         }
 
         emit({
           type: "done",
-          code: finalCode,
-          explanation: finalExplanation,
-          validated: !lastError,
-          validationError: lastError || undefined,
+          code: lastBuffer,
+          explanation: "Agent timed out. Partial edits may have been applied.",
+          validated: false,
+          validationError: "Timed out after 3 minutes",
         });
-        controller.enqueue(
-          encoder.encode("data: [DONE]\n\n"),
-        );
+        controller.enqueue(encoder.encode("data: [DONE]\n\n"));
         controller.close();
       } catch (error) {
         const msg =
-          error instanceof Error
-            ? error.message
-            : "Unknown error";
-        controller.enqueue(
-          encoder.encode(
-            `data: ${JSON.stringify({ type: "error", message: msg })}\n\n`,
-          ),
-        );
+          error instanceof Error ? error.message : "Unknown error";
+        emit({ type: "error", message: msg });
+        controller.enqueue(encoder.encode("data: [DONE]\n\n"));
         try {
           controller.close();
         } catch {
@@ -281,4 +386,166 @@ ${instruction}`;
       Connection: "keep-alive",
     },
   });
+}
+
+function summarizeDiff(oldCode: string, newCode: string): string {
+  const oldLines = oldCode.split("\n");
+  const newLines = newCode.split("\n");
+
+  if (oldLines.length !== newLines.length) {
+    const delta = newLines.length - oldLines.length;
+    return delta > 0
+      ? `Added ${delta} line${delta !== 1 ? "s" : ""}`
+      : `Removed ${Math.abs(delta)} line${Math.abs(delta) !== 1 ? "s" : ""}`;
+  }
+
+  let changedCount = 0;
+  for (let i = 0; i < oldLines.length; i++) {
+    if (oldLines[i] !== newLines[i]) changedCount++;
+  }
+  return `Modified ${changedCount} line${changedCount !== 1 ? "s" : ""}`;
+}
+
+/**
+ * Fallback for custom components without a sceneId — uses the old
+ * full-regeneration approach so they still work.
+ */
+function fallbackNonAgentic(
+  code: string,
+  instruction: string,
+  history: { role: string; content: string }[] | undefined,
+  apiKey: string,
+) {
+  const FALLBACK_PROMPT = `You are a precise React/Remotion component code editor.
+You receive the current component source code and a user instruction, then return the COMPLETE modified code.
+
+${COMPONENT_API_REFERENCE}
+
+## Output format
+1. Return the FULL modified component code inside a single \`\`\`tsx code fence.
+2. No partial patches — always the complete function from start to finish.
+3. After the code fence, write a 1-sentence explanation of what you changed.`;
+
+  const conversationHistory = (history || [])
+    .slice(-10)
+    .map(
+      (m) =>
+        `${m.role === "user" ? "User" : "Assistant"}: ${m.content}`,
+    )
+    .join("\n\n");
+
+  const prompt = `${FALLBACK_PROMPT}
+
+## Current Component Code
+\`\`\`tsx
+${code}
+\`\`\`
+
+${conversationHistory ? `## Conversation History\n${conversationHistory}\n` : ""}
+## User Instruction
+${instruction}`;
+
+  const encoder = new TextEncoder();
+  const client = new Subconscious({ apiKey });
+
+  const readable = new ReadableStream({
+    async start(controller) {
+      const emit = (data: Record<string, unknown>) => {
+        controller.enqueue(
+          encoder.encode(`data: ${JSON.stringify(data)}\n\n`),
+        );
+      };
+
+      try {
+        const stream = client.stream({
+          engine: SUBCONSCIOUS_CODING_ENGINE,
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          input: { instructions: prompt, tools: [] as any },
+        });
+
+        let fullContent = "";
+
+        for await (const event of stream) {
+          if (event.type === "delta") {
+            fullContent += event.content;
+            emit({ type: "delta", content: event.content });
+          } else if (event.type === "done") {
+            const answer = parseAnswer(fullContent);
+            const { code: extracted, explanation } =
+              extractCode(answer);
+
+            if (extracted) {
+              const validation = validateComponent(extracted);
+              emit({
+                type: "done",
+                code: validation.fixedCode || extracted,
+                explanation,
+                validated: validation.valid,
+                validationError: validation.error || undefined,
+              });
+            } else {
+              emit({ type: "error", message: "AI did not return code in a ```tsx fence." });
+            }
+          } else if (event.type === "error") {
+            emit({
+              type: "error",
+              message: (event as { message?: string }).message || "Unknown error",
+            });
+          }
+        }
+
+        controller.enqueue(encoder.encode("data: [DONE]\n\n"));
+        controller.close();
+      } catch (error) {
+        const msg =
+          error instanceof Error ? error.message : "Unknown error";
+        emit({ type: "error", message: msg });
+        controller.enqueue(encoder.encode("data: [DONE]\n\n"));
+        try {
+          controller.close();
+        } catch {
+          /* already closed */
+        }
+      }
+    },
+  });
+
+  return new Response(readable, {
+    headers: {
+      "Content-Type": "text/event-stream",
+      "Cache-Control": "no-cache",
+      Connection: "keep-alive",
+    },
+  });
+}
+
+function parseAnswer(fullContent: string): string {
+  try {
+    const parsed = JSON.parse(fullContent);
+    return typeof parsed.answer === "string"
+      ? parsed.answer
+      : JSON.stringify(parsed.answer);
+  } catch {
+    const m = fullContent.match(/"answer"\s*:\s*"((?:[^"\\]|\\.)*)"/);
+    if (m) {
+      return m[1]
+        .replace(/\\n/g, "\n")
+        .replace(/\\"/g, '"')
+        .replace(/\\\\/g, "\\");
+    }
+    return fullContent;
+  }
+}
+
+function extractCode(answer: string): {
+  code: string | null;
+  explanation: string;
+} {
+  const m = answer.match(
+    /```(?:tsx|typescript|jsx|javascript)?\s*\n([\s\S]*?)```/,
+  );
+  const code = m ? m[1].trim() : null;
+  const em = answer.match(/```[\s\S]*?```\s*\n*([\s\S]*)/);
+  const explanation = em ? em[1].trim() : "Changes applied.";
+  return { code, explanation };
 }
