@@ -80,14 +80,25 @@ export default function SignInPage() {
     try {
       await signIn("password", formData);
     } catch (err: unknown) {
-      if (err instanceof Error) {
-        if (err.message.includes("InvalidAccountId")) {
-          setError("No account found with this email. Try signing up.");
-        } else if (err.message.includes("InvalidSecret")) {
-          setError("Incorrect password. Please try again.");
-        } else {
-          setError(err.message);
-        }
+      const msg =
+        err instanceof Error
+          ? err.message
+          : typeof err === "string"
+            ? err
+            : JSON.stringify(err);
+
+      if (msg.includes("InvalidAccountId")) {
+        setError("No account found with this email.");
+        setFlow("signUp");
+      } else if (msg.includes("InvalidSecret")) {
+        setError("Incorrect password. Please try again.");
+      } else if (msg.includes("TooManyFailedAttempts") || msg.includes("RateLimited")) {
+        setError("Too many attempts. Please wait a moment and try again.");
+      } else if (msg.includes("AccountAlreadyExists") || msg.includes("UniqueTagViolation")) {
+        setError("An account with this email already exists.");
+        setFlow("signIn");
+      } else if (msg.includes("PasswordRequirements") || msg.includes("password")) {
+        setError("Password must be at least 8 characters.");
       } else {
         setError("Something went wrong. Please try again.");
       }
@@ -124,7 +135,7 @@ export default function SignInPage() {
             ? "Sign in to your account to continue."
             : hasDraft
               ? "Sign up to save your video and start editing."
-              : "Get started creating promotional videos."
+              : "Get started creating videos with AI."
           }
         </p>
 
