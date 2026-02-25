@@ -206,10 +206,13 @@ function discoverImagesFromTree(
   branch: string
 ): { url: string; name: string }[] {
   const results: { url: string; name: string; path: string }[] = [];
+  const seenNames = new Set<string>();
   for (const item of tree) {
     if (!IMAGE_EXTS.test(item.path)) continue;
     const rawUrl = `https://raw.githubusercontent.com/${owner}/${repo}/${branch}/${item.path}`;
     const fileName = item.path.split("/").pop() || item.path;
+    if (seenNames.has(fileName.toLowerCase())) continue;
+    seenNames.add(fileName.toLowerCase());
     results.push({ url: rawUrl, name: fileName, path: item.path });
   }
   results.sort(
@@ -752,9 +755,18 @@ export async function POST(req: NextRequest) {
           }
         }
 
-        // Step 7: Collect all images to import (deduplicated by URL and name)
+        // Step 7: Collect all images to import (deduplicated by URL, name, and existing media)
+        const existingMedia = await convex.query(api.media.getMedia, {
+          projectId: projectId as Id<"projects">,
+        });
+        const existingNames = new Set(
+          (existingMedia || []).map(
+            (m: { name: string }) => m.name.toLowerCase()
+          )
+        );
+
         const allImages = new Map<string, string>();
-        const usedNames = new Set<string>();
+        const usedNames = new Set<string>(existingNames);
 
         const addImage = (url: string, name: string) => {
           if (allImages.has(url)) return;

@@ -126,6 +126,16 @@ function stripAndFix(code: string): string {
     },
   );
 
+  // Fix theme.brandColors → theme.colors (brandColors doesn't exist)
+  fixed = fixed.replace(/theme\.brandColors\.foreground/g, "theme.colors.text");
+  fixed = fixed.replace(/theme\.brandColors\.background/g, "theme.colors.background");
+  fixed = fixed.replace(/theme\.brandColors\.primary/g, "theme.colors.primary");
+  fixed = fixed.replace(/theme\.brandColors\.secondary/g, "theme.colors.secondary");
+  fixed = fixed.replace(/theme\.brandColors\.accent/g, "theme.colors.accent");
+  fixed = fixed.replace(/theme\.brandColors\./g, "theme.colors.");
+  fixed = fixed.replace(/theme\.foreground\b/g, "theme.colors.text");
+  fixed = fixed.replace(/theme\.palette\./g, "theme.colors.");
+
   return fixed;
 }
 

@@ -104,6 +104,12 @@ WRONG:   fadeInUp(frame, 0.5, 20)   ← 0.5 is not a valid frame number
 theme.colors: { background, surface, primary, secondary, text, textMuted, accent }
 theme.fonts: { heading, body }
 theme.borderRadius: number
+IMPORTANT: The theme object has ONLY these properties. There is NO theme.brandColors, NO theme.foreground,
+NO theme.palette, NO theme.brand. If you need colors, use theme.colors.primary, theme.colors.background, etc.
+WRONG: theme.brandColors.foreground  ← brandColors does NOT exist, will crash
+WRONG: theme.foreground              ← does NOT exist
+CORRECT: theme.colors.text           ← use this for text/foreground color
+CORRECT: theme.colors.background     ← use this for background color
 
 ### Content object shape (passed as prop)
 content: { headline, subtext, buttonText, bullets, features, steps, stats, questions, items, cells, milestones, members, reviews, logos, before, after, quote, author, price, date, rating, reviewCount, mediaUrl, layout }
@@ -121,4 +127,6 @@ content: { headline, subtext, buttonText, bullets, features, steps, stats, quest
    Slice your text: myString.slice(0, tw.visibleChars). NEVER pass the return value directly as a React child.
 10. counterSpinUp() returns a raw float. Always format: Math.round(counterSpinUp(...)) or .toFixed(0).
 11. NEVER pass an object as a React child. Only strings and numbers are valid children.
+12. theme has ONLY: theme.colors, theme.fonts, theme.borderRadius. There is NO theme.brandColors,
+    NO theme.foreground, NO theme.palette. Use theme.colors.text for foreground, theme.colors.background for bg.
 `;

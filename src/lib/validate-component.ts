@@ -83,9 +83,6 @@ function stripAndFix(code: string): string {
   );
 
   // Fix typewriterReveal used with a string arg instead of totalChars number.
-  // Pattern: typewriterReveal(frame, delay, someStringVar) where 3rd arg is not a number.
-  // We can't fully fix usage as a React child statically, but we add a warning via the
-  // validation step below. Here we fix the common "pass string instead of .length":
   fixed = fixed.replace(
     /typewriterReveal\((\w+),\s*(\w+),\s*(\w+)\s*\)/g,
     (match, f, d, third) => {
@@ -94,6 +91,16 @@ function stripAndFix(code: string): string {
       return `typewriterReveal(${f}, ${d}, ${third}.length)`;
     },
   );
+
+  // Fix theme.brandColors → theme.colors (brandColors doesn't exist)
+  fixed = fixed.replace(/theme\.brandColors\.foreground/g, "theme.colors.text");
+  fixed = fixed.replace(/theme\.brandColors\.background/g, "theme.colors.background");
+  fixed = fixed.replace(/theme\.brandColors\.primary/g, "theme.colors.primary");
+  fixed = fixed.replace(/theme\.brandColors\.secondary/g, "theme.colors.secondary");
+  fixed = fixed.replace(/theme\.brandColors\.accent/g, "theme.colors.accent");
+  fixed = fixed.replace(/theme\.brandColors\./g, "theme.colors.");
+  fixed = fixed.replace(/theme\.foreground\b/g, "theme.colors.text");
+  fixed = fixed.replace(/theme\.palette\./g, "theme.colors.");
 
   return fixed;
 }

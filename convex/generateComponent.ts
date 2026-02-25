@@ -304,7 +304,17 @@ export const generateComponentHttp = httpAction(
             | Record<string, unknown>
             | undefined;
           if (dc) {
-            projectDesignContext = `\n## Project Theme\n\`\`\`json\n${JSON.stringify(dc, null, 2)}\n\`\`\`\n`;
+            projectDesignContext = `\n## Project Design Reference (for visual inspiration ONLY)
+\`\`\`json
+${JSON.stringify(dc, null, 2)}
+\`\`\`
+IMPORTANT: These colors are for REFERENCE. Use them as hardcoded hex strings in your code.
+Do NOT access theme.brandColors — it does NOT exist. The theme object only has:
+  theme.colors.{background, surface, primary, secondary, text, textMuted, accent}
+  theme.fonts.{heading, body}
+  theme.borderRadius
+Use the brand colors above as literal hex values, e.g.: const accentOrange = '#FF5C28';
+`;
           }
         }
       }
@@ -493,7 +503,15 @@ export const editGeneratedSceneHttp = httpAction(
             { projectId },
           );
           if (project?.designContext) {
-            designContext = `\n## Project Theme\n\`\`\`json\n${JSON.stringify(project.designContext, null, 2)}\n\`\`\`\n`;
+            designContext = `\n## Project Design Reference (for visual inspiration ONLY)
+\`\`\`json
+${JSON.stringify(project.designContext, null, 2)}
+\`\`\`
+IMPORTANT: These colors are for REFERENCE. Use them as hardcoded hex strings.
+Do NOT access theme.brandColors — it does NOT exist. The theme only has:
+  theme.colors.{background, surface, primary, secondary, text, textMuted, accent}
+Use brand colors as literal hex values, e.g.: const accentOrange = '#FF5C28';
+`;
           }
         } catch {
           /* best-effort */
