@@ -33,6 +33,100 @@ export default function Home() {
         <Features />
         <HowItWorks />
 
+        {/* Video Showcase */}
+        <section className="py-24 px-4" style={{ background: "var(--background)" }}>
+          <div className="max-w-6xl mx-auto">
+            <div className="text-center mb-16">
+              <p
+                className="text-xs font-semibold tracking-[0.15em] uppercase mb-3"
+                style={{ color: "var(--brand-orange)" }}
+              >
+                Made with Subconscious
+              </p>
+              <h2
+                className="text-3xl md:text-4xl font-bold mb-4"
+                style={{ color: "var(--foreground)" }}
+              >
+                See what you can create
+              </h2>
+              <p
+                className="text-base max-w-lg mx-auto"
+                style={{ color: "var(--muted)" }}
+              >
+                Real videos built with our AI-powered editor — from product demos to marketing clips.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              {[
+                {
+                  src: "/videos/receipt-agent-demo.mp4",
+                  title: "Receipt Agent Demo",
+                  description: "AI-powered receipt scanning and expense tracking",
+                },
+                {
+                  src: "/videos/trigger-video.mp4",
+                  title: "Trigger Automation",
+                  description: "Workflow automation with intelligent triggers",
+                },
+                {
+                  src: "/videos/subconscious-demo.mp4",
+                  title: "Subconscious Platform",
+                  description: "Build AI agents that work for you",
+                },
+              ].map((video) => (
+                <div
+                  key={video.src}
+                  className="group rounded-2xl overflow-hidden border transition-all hover:border-[var(--brand-orange)]/30 hover:shadow-[0_8px_40px_rgba(255,92,40,0.08)]"
+                  style={{
+                    background: "var(--surface)",
+                    borderColor: "var(--border)",
+                  }}
+                >
+                  <div className="relative aspect-video bg-black">
+                    <video
+                      src={video.src}
+                      className="w-full h-full object-cover"
+                      muted
+                      loop
+                      playsInline
+                      onMouseEnter={(e) => e.currentTarget.play()}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.pause();
+                        e.currentTarget.currentTime = 0;
+                      }}
+                    />
+                    <div className="absolute inset-0 flex items-center justify-center opacity-60 group-hover:opacity-0 transition-opacity pointer-events-none">
+                      <div
+                        className="w-12 h-12 rounded-full flex items-center justify-center"
+                        style={{ background: "rgba(255,255,255,0.15)", backdropFilter: "blur(8px)" }}
+                      >
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="white">
+                          <path d="M8 5v14l11-7z" />
+                        </svg>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="p-5">
+                    <h3
+                      className="text-sm font-semibold mb-1"
+                      style={{ color: "var(--foreground)" }}
+                    >
+                      {video.title}
+                    </h3>
+                    <p
+                      className="text-xs"
+                      style={{ color: "var(--muted)" }}
+                    >
+                      {video.description}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+
         <section className="py-20 px-4">
           <div
             className="max-w-3xl mx-auto rounded-2xl p-12 text-center relative overflow-hidden"
