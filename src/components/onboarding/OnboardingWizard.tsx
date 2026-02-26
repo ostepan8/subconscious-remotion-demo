@@ -326,30 +326,41 @@ export default function OnboardingWizard({
     if (createdRef.current) return;
     createdRef.current = true;
     setCreating(true);
-    try {
-      saveDraft({ title, description, githubUrl, theme });
-      const { externalId, projectId } = await createProject({
-        title: title.trim(),
-        description: description.trim(),
-        theme,
-        githubUrl: githubUrl.trim() || undefined,
-      });
-      if (githubUrl.trim()) {
-        fetch("/api/github/extract", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            githubUrl: githubUrl.trim(),
-            projectId,
-          }),
-        }).catch(() => {});
+    saveDraft({ title, description, githubUrl, theme });
+
+    for (let attempt = 0; attempt < 5; attempt++) {
+      try {
+        if (attempt > 0) {
+          await new Promise((r) => setTimeout(r, 1000 * attempt));
+        }
+        const { externalId, projectId } = await createProject({
+          title: title.trim(),
+          description: description.trim(),
+          theme,
+          githubUrl: githubUrl.trim() || undefined,
+        });
+        if (githubUrl.trim()) {
+          fetch("/api/github/extract", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              githubUrl: githubUrl.trim(),
+              projectId,
+            }),
+          }).catch(() => {});
+        }
+        clearDraft();
+        router.push(`/editor/${externalId}`);
+        return;
+      } catch {
+        // Auth may not be propagated yet, retry
       }
-      clearDraft();
-      router.push(`/editor/${externalId}`);
-    } catch {
-      createdRef.current = false;
-      setCreating(false);
     }
+
+    // All retries exhausted — redirect to dashboard with draft saved
+    createdRef.current = false;
+    setCreating(false);
+    router.push("/dashboard");
   }, [title, description, githubUrl, theme, createProject, router]);
 
   useEffect(() => {

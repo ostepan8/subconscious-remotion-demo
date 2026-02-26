@@ -28,26 +28,36 @@ export default function SignInPage() {
       return;
     }
     createdRef.current = true;
-    try {
-      const { externalId, projectId } = await createProject({
-        title: draft.title,
-        description: draft.description,
-        theme: draft.theme,
-        githubUrl: draft.githubUrl || undefined,
-      });
-      if (draft.githubUrl) {
-        fetch("/api/github/extract", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ githubUrl: draft.githubUrl, projectId }),
-        }).catch(() => {});
+
+    for (let attempt = 0; attempt < 5; attempt++) {
+      try {
+        if (attempt > 0) {
+          await new Promise((r) => setTimeout(r, 1000 * attempt));
+        }
+        const { externalId, projectId } = await createProject({
+          title: draft.title,
+          description: draft.description,
+          theme: draft.theme,
+          githubUrl: draft.githubUrl || undefined,
+        });
+        if (draft.githubUrl) {
+          fetch("/api/github/extract", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ githubUrl: draft.githubUrl, projectId }),
+          }).catch(() => {});
+        }
+        clearDraft();
+        router.replace(`/editor/${externalId}`);
+        return;
+      } catch {
+        // Auth may not be propagated to server yet, retry
       }
-      clearDraft();
-      router.replace(`/editor/${externalId}`);
-    } catch {
-      createdRef.current = false;
-      router.replace("/dashboard");
     }
+
+    // All retries exhausted — go to dashboard
+    createdRef.current = false;
+    router.replace("/dashboard");
   }, [createProject, router]);
 
   useEffect(() => {
