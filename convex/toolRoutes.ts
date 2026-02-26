@@ -248,6 +248,15 @@ export const updateProjectTool = httpAction(async (ctx, request) => {
   }
 });
 
+function countWords(text: string): number {
+  return text.trim().split(/\s+/).filter(Boolean).length;
+}
+
+function maxWordsForDuration(durationInFrames: number, fps = 30): number {
+  const seconds = durationInFrames / fps;
+  return Math.floor(seconds * 2.2);
+}
+
 export const generateVoiceoverScript = httpAction(async (ctx, request) => {
   try {
     const body = await request.json();
@@ -255,11 +264,32 @@ export const generateVoiceoverScript = httpAction(async (ctx, request) => {
     const sceneId = params.sceneId as Id<"scenes"> | undefined;
 
     if (sceneId && params.script) {
+      const script = String(params.script);
+      const scene = await ctx.runQuery(api.scenes.getScene, { sceneId });
+      if (!scene) return errorJson("Scene not found");
+
+      const maxWords = maxWordsForDuration(scene.durationInFrames);
+      const wordCount = countWords(script);
+
+      if (wordCount > maxWords) {
+        return json({
+          success: false,
+          error: `Script is too long: ${wordCount} words but scene is ${scene.durationInFrames} frames (${(scene.durationInFrames / 30).toFixed(1)}s). Maximum ~${maxWords} words at ~2.2 words/sec speaking rate. Shorten the script and try again.`,
+          wordCount,
+          maxWords,
+          durationInFrames: scene.durationInFrames,
+          durationSeconds: +(scene.durationInFrames / 30).toFixed(1),
+        });
+      }
+
       await ctx.runMutation(api.scenes.updateScene, {
         sceneId,
-        voiceoverScript: String(params.script),
+        voiceoverScript: script,
       });
-      return json({ success: true, message: "Voiceover script saved to scene" });
+      return json({
+        success: true,
+        message: `Voiceover script saved (${wordCount}/${maxWords} words for ${(scene.durationInFrames / 30).toFixed(1)}s scene)`,
+      });
     }
 
     if (params.scripts && typeof params.scripts === "string") {
@@ -267,10 +297,33 @@ export const generateVoiceoverScript = httpAction(async (ctx, request) => {
         sceneId: string;
         script: string;
       }[];
+      const warnings: string[] = [];
       for (const s of scripts) {
+        const scene = await ctx.runQuery(api.scenes.getScene, {
+          sceneId: s.sceneId as Id<"scenes">,
+        });
+        if (!scene) {
+          warnings.push(`Scene ${s.sceneId} not found`);
+          continue;
+        }
+        const maxWords = maxWordsForDuration(scene.durationInFrames);
+        const wordCount = countWords(s.script);
+        if (wordCount > maxWords) {
+          warnings.push(
+            `Scene "${scene.title}" (${s.sceneId}): ${wordCount} words exceeds max ${maxWords} for ${(scene.durationInFrames / 30).toFixed(1)}s. Shorten it.`,
+          );
+          continue;
+        }
         await ctx.runMutation(api.scenes.updateScene, {
           sceneId: s.sceneId as Id<"scenes">,
           voiceoverScript: s.script,
+        });
+      }
+      if (warnings.length > 0) {
+        return json({
+          success: false,
+          error: "Some scripts were too long and were NOT saved. Fix these and resubmit:\n" + warnings.join("\n"),
+          warnings,
         });
       }
       return json({

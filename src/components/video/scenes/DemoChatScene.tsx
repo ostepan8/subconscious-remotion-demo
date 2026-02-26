@@ -13,6 +13,7 @@ import {
   shimmerStyle,
   scanLineStyle,
   typewriterReveal,
+  resolvePublicAsset,
 } from "./shared";
 
 const font = "Inter, system-ui, -apple-system, sans-serif";
@@ -129,7 +130,7 @@ export default function DemoChatScene({
           }}
         >
           <Img
-            src="/brand/Subconscious_Logo_Graphic.svg"
+            src={resolvePublicAsset("/brand/Subconscious_Logo_Graphic.svg")}
             style={{ width: 28, height: 28 }}
           />
           <div>
@@ -248,7 +249,7 @@ export default function DemoChatScene({
               }}
             >
               <Img
-                src="/brand/Subconscious_Logo_Graphic.svg"
+                src={resolvePublicAsset("/brand/Subconscious_Logo_Graphic.svg")}
                 style={{
                   width: 24,
                   height: 24,

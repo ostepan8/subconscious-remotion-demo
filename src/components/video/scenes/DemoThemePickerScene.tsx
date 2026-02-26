@@ -13,6 +13,7 @@ import {
   breathe,
   scanLineStyle,
   gradientText,
+  resolvePublicAsset,
 } from "./shared";
 
 const font = "Inter, system-ui, -apple-system, sans-serif";
@@ -167,7 +168,7 @@ export default function DemoThemePickerScene({
           <div style={headerStyle}>
             <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
               <Img
-                src="/brand/Subconscious_Logo_Graphic.svg"
+                src={resolvePublicAsset("/brand/Subconscious_Logo_Graphic.svg")}
                 style={{ width: 26, height: 26 }}
               />
               <span

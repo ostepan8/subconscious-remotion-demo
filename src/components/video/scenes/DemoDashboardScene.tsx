@@ -11,6 +11,7 @@ import {
   shimmerStyle,
   scanLineStyle,
   breathe,
+  resolvePublicAsset,
 } from "./shared";
 
 const b = {
@@ -194,7 +195,7 @@ function NavBar({ frame }: { frame: number }) {
     >
       <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
         <Img
-          src="/brand/Subconscious_Logo_Graphic.svg"
+          src={resolvePublicAsset("/brand/Subconscious_Logo_Graphic.svg")}
           style={{ width: 26, height: 26 }}
         />
         <span

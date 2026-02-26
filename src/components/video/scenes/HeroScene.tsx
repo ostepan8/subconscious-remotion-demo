@@ -16,6 +16,7 @@ import {
   themedButtonStyle,
   isThemeDark,
   easings,
+  resolvePublicAsset,
 } from "./shared";
 import MockupPlaceholder from "./MockupPlaceholder";
 
@@ -99,7 +100,7 @@ export default function HeroScene({
                 transformOrigin: "center center",
               }}>
                 <Img
-                  src={content.mediaUrl as string}
+                  src={resolvePublicAsset(content.mediaUrl as string)}
                   style={{
                     width: "100%",
                     height: "100%",

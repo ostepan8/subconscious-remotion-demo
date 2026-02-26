@@ -1,6 +1,23 @@
-import { interpolate, Easing } from "remotion";
+import { interpolate, Easing, staticFile } from "remotion";
 import type { VideoTheme, SceneStyleOverrides } from "@/types";
 import type { CSSProperties } from "react";
+
+// ---------------------------------------------------------------------------
+// Public asset resolution — works in both Next.js and Remotion bundle contexts
+// ---------------------------------------------------------------------------
+
+export function resolvePublicAsset(path: string): string {
+  if (
+    !path ||
+    path.startsWith("http://") ||
+    path.startsWith("https://") ||
+    path.startsWith("data:")
+  ) {
+    return path;
+  }
+  const cleanPath = path.startsWith("/") ? path.slice(1) : path;
+  return staticFile(cleanPath);
+}
 
 // ---------------------------------------------------------------------------
 // Safe theme defaults — prevents crashes when theme/colors/fonts are missing

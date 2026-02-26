@@ -8,6 +8,7 @@ import {
   scanLineStyle,
   shimmerStyle,
   breathe,
+  resolvePublicAsset,
 } from "./shared";
 
 const font = "Inter, system-ui, -apple-system, sans-serif";
@@ -164,7 +165,7 @@ export default function DemoEditorScene({
         {/* Screenshot — static, no zoom */}
         <div style={{ flex: 1, position: "relative", overflow: "hidden" }}>
           <Img
-            src="/screenshots/editor.png"
+            src={resolvePublicAsset("/screenshots/editor.png")}
             style={{
               width: "100%",
               height: "100%",
