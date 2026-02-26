@@ -83,25 +83,6 @@ export default function Hero({ onStart }: HeroProps) {
           </a>
         </div>
 
-        <div className="mt-16 animate-fade-in-up" style={{ animationDelay: "0.6s" }}>
-          <p className="text-xs font-medium mb-4" style={{ color: "var(--muted)" }}>
-            Generates videos like this in minutes
-          </p>
-          <div className="flex justify-center gap-3">
-            {[
-              { bg: "linear-gradient(135deg, #0f0c29, #302b63)", label: "Tech Startup" },
-              { bg: "linear-gradient(135deg, #f0f4ff, #dbeafe)", label: "SaaS" },
-              { bg: "linear-gradient(135deg, #ff5c28, #ffd54f)", label: "Agency" },
-            ].map((t) => (
-              <div
-                key={t.label}
-                className="w-24 sm:w-32 aspect-video rounded-xl border transition-transform hover:scale-105"
-                style={{ background: t.bg, borderColor: "var(--border-subtle)" }}
-                title={t.label}
-              />
-            ))}
-          </div>
-        </div>
       </div>
     </section>
   );
