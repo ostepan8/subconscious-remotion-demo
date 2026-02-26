@@ -3240,6 +3240,14 @@ function ComponentLivePreview({
                 appendActivity(
                   `[Error] ${event.message}`,
                 );
+                setChatMessages((prev) => {
+                  const updated = [...prev];
+                  updated[updated.length - 1] = {
+                    role: "assistant",
+                    content: `Error: ${event.message}`,
+                  };
+                  return updated;
+                });
               }
             } catch {
               /* skip malformed */

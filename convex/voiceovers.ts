@@ -86,6 +86,26 @@ export const getAudioUrl = query({
   },
 });
 
+export const getVoiceoversWithUrls = query({
+  args: { projectId: v.id("projects") },
+  handler: async (ctx, args) => {
+    const voiceovers = await ctx.db
+      .query("voiceovers")
+      .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
+      .collect();
+
+    const results = [];
+    for (const vo of voiceovers) {
+      let audioUrl: string | null = null;
+      if (vo.status === "ready" && vo.audioStorageId) {
+        audioUrl = await ctx.storage.getUrl(vo.audioStorageId);
+      }
+      results.push({ ...vo, audioUrl });
+    }
+    return results;
+  },
+});
+
 export const createAndScheduleVoiceover = mutation({
   args: {
     projectId: v.id("projects"),

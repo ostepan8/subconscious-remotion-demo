@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
 import Navbar from "@/components/layout/Navbar";
 import AuthGuard from "@/components/auth/AuthGuard";
 import ThemeSelector from "@/components/editor/ThemeSelector";
@@ -209,12 +210,18 @@ function DashboardContent() {
           className="text-center py-20 rounded-2xl border border-dashed"
           style={{ borderColor: "var(--border)" }}
         >
-          <div className="text-4xl mb-4">🎬</div>
+          <Image
+            src="/brand/Subconscious_Logo_Graphic.svg"
+            alt="Subconscious"
+            width={48}
+            height={48}
+            className="mx-auto mb-4 opacity-30"
+          />
           <h3 className="text-lg font-semibold mb-2" style={{ color: "var(--foreground)" }}>
             No videos yet
           </h3>
           <p className="text-sm mb-6" style={{ color: "var(--muted)" }}>
-            Create your first promotional video to get started.
+            Create your first video with Subconscious AI.
           </p>
           <button
             onClick={() => setShowCreate(true)}

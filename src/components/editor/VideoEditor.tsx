@@ -1,7 +1,23 @@
 "use client";
 
-import { useState, useCallback, useRef, useEffect } from "react";
+import { useState, useCallback, useRef, useEffect, useMemo } from "react";
+
+/**
+ * Returns a referentially-stable version of `value`.
+ * Only returns a new reference when the JSON representation changes,
+ * preventing Convex reactive queries (which return new object references
+ * on every sync cycle) from causing downstream re-renders.
+ */
+function useStableValue<T>(value: T): T {
+  const ref = useRef<{ json: string; value: T }>({ json: "", value });
+  const json = JSON.stringify(value);
+  if (json !== ref.current.json) {
+    ref.current = { json, value };
+  }
+  return ref.current.value;
+}
 import { useQuery, useMutation } from "convex/react";
+import { prefetch } from "remotion";
 import type { PlayerRef } from "@remotion/player";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
@@ -71,6 +87,9 @@ function getImageDimensions(file: File): Promise<{ width: number; height: number
 
 export default function VideoEditor({ project }: VideoEditorProps) {
   const scenes = useQuery(api.scenes.getScenes, {
+    projectId: project._id,
+  });
+  const voiceovers = useQuery(api.voiceovers.getVoiceoversWithUrls, {
     projectId: project._id,
   });
   const addScene = useMutation(api.scenes.addScene);
@@ -263,14 +282,61 @@ export default function VideoEditor({ project }: VideoEditorProps) {
     player.seekTo(frame + delta);
   }, []);
 
-  const sceneData: SceneData[] = (scenes || []).map((s) => ({
-    id: s._id as string,
-    type: s.type as SceneType,
-    title: s.title,
-    content: (s.content || {}) as SceneContent,
-    durationInFrames: s.durationInFrames,
-    transition: s.transition,
-  }));
+  const prefetchedRef = useRef<Map<string, () => void>>(new Map());
+
+  const voiceoverUrlMap = useMemo(() => {
+    const map = new Map<string, string>();
+    if (voiceovers) {
+      for (const vo of voiceovers) {
+        if (vo.sceneId && vo.audioUrl && vo.status === "ready") {
+          map.set(vo.sceneId, vo.audioUrl);
+        }
+      }
+    }
+    return map;
+  }, [voiceovers]);
+
+  useEffect(() => {
+    const currentUrls = new Set<string>();
+    for (const url of voiceoverUrlMap.values()) {
+      currentUrls.add(url);
+      if (!prefetchedRef.current.has(url)) {
+        const { free } = prefetch(url, {
+          method: "blob-url",
+        });
+        prefetchedRef.current.set(url, free);
+      }
+    }
+    for (const [url, free] of prefetchedRef.current) {
+      if (!currentUrls.has(url)) {
+        free();
+        prefetchedRef.current.delete(url);
+      }
+    }
+  }, [voiceoverUrlMap]);
+
+  useEffect(() => {
+    return () => {
+      for (const free of prefetchedRef.current.values()) free();
+      prefetchedRef.current.clear();
+    };
+  }, []);
+
+  const rawSceneData: SceneData[] = useMemo(
+    () =>
+      (scenes || []).map((s) => ({
+        id: s._id as string,
+        type: s.type as SceneType,
+        title: s.title,
+        content: (s.content || {}) as SceneContent,
+        durationInFrames: s.durationInFrames,
+        transition: s.transition,
+        voiceoverAudioUrl: voiceoverUrlMap.get(s._id) || undefined,
+      })),
+    [scenes, voiceoverUrlMap],
+  );
+
+  const sceneData = useStableValue(rawSceneData);
 
   const activeScene = scenes?.find((s) => s._id === activeSceneId);
   const splittingSceneData = scenes?.find((s) => s._id === splittingScene);

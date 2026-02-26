@@ -21,6 +21,7 @@ import {
   readBuffer,
   appendCode,
   finalizeComponent,
+  reportError,
   updateGenerationStatus,
   exploreRepo,
   readFile,
@@ -70,6 +71,7 @@ http.route({ path: "/tools/search-repo-files", method: "POST", handler: searchRe
 http.route({ path: "/tools/save-generated-code", method: "POST", handler: saveGeneratedCode });
 http.route({ path: "/tools/append-code", method: "POST", handler: appendCode });
 http.route({ path: "/tools/finalize-component", method: "POST", handler: finalizeComponent });
+http.route({ path: "/tools/report-error", method: "POST", handler: reportError });
 http.route({ path: "/tools/update-generation-status", method: "POST", handler: updateGenerationStatus });
 http.route({ path: "/tools/generate-component", method: "POST", handler: generateComponentHttp });
 http.route({ path: "/tools/edit-generated-scene", method: "POST", handler: editGeneratedSceneHttp });

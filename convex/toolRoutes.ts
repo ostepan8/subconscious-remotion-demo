@@ -948,6 +948,38 @@ export const finalizeComponent = httpAction(async (ctx, request) => {
   }
 });
 
+export const reportError = httpAction(async (ctx, request) => {
+  try {
+    const body = await request.json();
+    const params = parseBody(body);
+    const sceneId = params.sceneId as Id<"scenes">;
+    const errorMessage = params.errorMessage
+      ? String(params.errorMessage)
+      : "The agent was unable to complete the request.";
+
+    if (!sceneId) return errorJson("sceneId is required");
+
+    const scene = await ctx.runQuery(api.scenes.getScene, { sceneId });
+    if (!scene) return errorJson("Scene not found");
+
+    const existingContent =
+      (scene.content as Record<string, unknown>) || {};
+
+    await ctx.runMutation(api.scenes.updateScene, {
+      sceneId,
+      content: {
+        ...existingContent,
+        generationStatus: "error",
+        generationError: errorMessage,
+      },
+    });
+
+    return json({ success: true, status: "error", message: errorMessage });
+  } catch (e) {
+    return errorJson("report_error failed", String(e));
+  }
+});
+
 export const updateGenerationStatus = httpAction(async (ctx, request) => {
   try {
     const body = await request.json();

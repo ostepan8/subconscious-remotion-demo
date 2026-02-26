@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import { useQuery } from "convex/react";
+import Image from "next/image";
 import { api } from "../../../convex/_generated/api";
 import { useChat } from "@/hooks/useChat";
 import type { Id } from "../../../convex/_generated/dataModel";
@@ -79,14 +80,15 @@ export default function ChatSidebar({
         className="px-3 py-2 border-b flex items-center gap-2"
         style={{ borderColor: "var(--border-subtle)" }}
       >
-        <div
-          className="w-5 h-5 rounded flex items-center justify-center text-[9px] font-bold text-white"
-          style={{ background: "var(--brand-orange)" }}
-        >
-          AI
-        </div>
+        <Image
+          src="/brand/Subconscious_Logo_Graphic.svg"
+          alt=""
+          width={20}
+          height={20}
+          className="shrink-0"
+        />
         <h3 className="text-sm font-semibold" style={{ color: "var(--foreground)" }}>
-          Video Assistant
+          Subconscious Agent
         </h3>
         {isStreaming && (
           <div

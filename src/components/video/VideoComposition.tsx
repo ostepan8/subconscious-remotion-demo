@@ -1,6 +1,7 @@
 import React from "react";
 import {
   AbsoluteFill,
+  Audio,
   Sequence,
   useCurrentFrame,
   interpolate,
@@ -30,6 +31,11 @@ import LogoCloudScene from "./scenes/LogoCloudScene";
 import ComparisonScene from "./scenes/ComparisonScene";
 import FAQScene from "./scenes/FAQScene";
 import GeneratedScene from "./scenes/GeneratedScene";
+import DemoDashboardScene from "./scenes/DemoDashboardScene";
+import DemoEditorScene from "./scenes/DemoEditorScene";
+import DemoChatScene from "./scenes/DemoChatScene";
+import DemoThemePickerScene from "./scenes/DemoThemePickerScene";
+import DemoVoiceoverScene from "./scenes/DemoVoiceoverScene";
 
 export const TRANSITION_DURATION_FRAMES = 15;
 
@@ -41,6 +47,7 @@ export interface SceneData {
   durationInFrames: number;
   transition: string;
   voiceoverScript?: string;
+  voiceoverAudioUrl?: string;
   track?: number;
 }
 
@@ -71,6 +78,11 @@ const SCENE_COMPONENTS: Record<
   comparison: ComparisonScene,
   faq: FAQScene,
   generated: GeneratedScene,
+  "demo-dashboard": DemoDashboardScene,
+  "demo-editor": DemoEditorScene,
+  "demo-chat": DemoChatScene,
+  "demo-theme-picker": DemoThemePickerScene,
+  "demo-voiceover": DemoVoiceoverScene,
 };
 
 interface VideoCompositionProps {
@@ -173,13 +185,20 @@ export default function VideoComposition({
 
         return (
           <Sequence
-            key={`scene-${idx}`}
+            key={scene.id || `scene-${idx}`}
             from={from}
             durationInFrames={duration}
           >
             <AbsoluteFill style={{ opacity: fadeIn }}>
               <SceneComp content={scene.content} theme={theme} />
             </AbsoluteFill>
+            {scene.voiceoverAudioUrl && (
+              <Audio
+                src={scene.voiceoverAudioUrl}
+                volume={1}
+                pauseWhenBuffering
+              />
+            )}
             <TransitionOverlay
               progress={interpolate(
                 localFrame,
