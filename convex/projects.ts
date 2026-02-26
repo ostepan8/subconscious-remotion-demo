@@ -1,5 +1,6 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
+import { getAuthUserId } from "@convex-dev/auth/server";
 
 export const getProjectById = query({
   args: { projectId: v.id("projects") },
@@ -23,7 +24,12 @@ export const getProject = query({
 export const getMyProjects = query({
   args: {},
   handler: async (ctx) => {
-    return await ctx.db.query("projects").collect();
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return [];
+    return await ctx.db
+      .query("projects")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .collect();
   },
 });
 
@@ -35,6 +41,8 @@ export const createProject = mutation({
     githubUrl: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Not authenticated");
     const externalId = `proj_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
     const projectId = await ctx.db.insert("projects", {
       title: args.title,
@@ -42,6 +50,7 @@ export const createProject = mutation({
       theme: args.theme,
       status: "active",
       externalId,
+      userId,
       githubUrl: args.githubUrl,
     });
     return { externalId, projectId };
@@ -51,6 +60,12 @@ export const createProject = mutation({
 export const deleteProject = mutation({
   args: { projectId: v.id("projects") },
   handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Not authenticated");
+    const project = await ctx.db.get(args.projectId);
+    if (!project || (project.userId && project.userId !== userId)) {
+      throw new Error("Project not found");
+    }
     const scenes = await ctx.db
       .query("scenes")
       .withIndex("by_project", (q) =>
