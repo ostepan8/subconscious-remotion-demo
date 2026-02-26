@@ -353,7 +353,7 @@ export default function OnboardingWizard({
   }, [title, description, githubUrl, theme, createProject, router]);
 
   useEffect(() => {
-    if (isAuthenticated && step === lastStep && !createdRef.current) {
+    if (isAuthenticated && step >= lastStep && !createdRef.current) {
       doCreate();
     }
   }, [isAuthenticated, step, lastStep, doCreate]);
@@ -688,6 +688,15 @@ export default function OnboardingWizard({
                   : "Continue"}
                 {!creating && arrow}
               </button>
+            </div>
+          )}
+
+          {/* Post-auth: creating project */}
+          {step >= 4 && isAuthenticated && (
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 16, paddingTop: 40 }}>
+              <div style={{ width: 32, height: 32, border: "2px solid #ff5c28", borderTopColor: "transparent", borderRadius: "50%", animation: "spin 0.8s linear infinite" }} />
+              <p style={{ fontSize: 15, color: "#8b949e" }}>Creating your video...</p>
+              <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
             </div>
           )}
 
