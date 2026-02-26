@@ -4,6 +4,8 @@ import { saas } from "./saas";
 import { portfolio } from "./portfolio";
 import { agency } from "./agency";
 import { ecommerce } from "./ecommerce";
+import { retroHtml } from "./retro-html";
+import { newConsumer } from "./new-consumer";
 
 export const themes: Record<string, VideoTheme> = {
   "tech-startup": techStartup,
@@ -11,6 +13,8 @@ export const themes: Record<string, VideoTheme> = {
   portfolio,
   agency,
   ecommerce,
+  "retro-html": retroHtml,
+  "new-consumer": newConsumer,
 };
 
 export const themeList: VideoTheme[] = Object.values(themes);

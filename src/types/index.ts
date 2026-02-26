@@ -7,7 +7,7 @@ export interface SceneStyleOverrides {
 }
 
 export interface ThemePersonality {
-  vibe: "cyberpunk" | "minimal" | "editorial" | "energetic" | "luxury";
+  vibe: "cyberpunk" | "minimal" | "editorial" | "energetic" | "luxury" | "retro" | "consumer";
   mood: string;
   designPrompt: string;
 }
