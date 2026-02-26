@@ -89,14 +89,13 @@ ALL of these return { position:'absolute', inset:0, ... } — render as separate
 // System prompt — kept short and direct
 // ---------------------------------------------------------------------------
 
-const SUBAGENT_SYSTEM_PROMPT = `You are a Remotion scene builder. You create CONCISE, visually striking video scenes at 1920×1080.
+const SUBAGENT_SYSTEM_PROMPT = `You are a Remotion scene builder creating polished, visually rich video scenes at 1920×1080.
 
-## CRITICAL: Keep it SHORT
-Your code MUST be under 80 lines. React.createElement is verbose, so keep your design SIMPLE:
-- Maximum 3 visual elements (e.g. 1 headline + 1 subtitle + 1 row of 3 stat numbers)
-- Use a helper function for repeated elements (e.g. a card() function called 3 times)
-- ONE background layer (animatedMeshBg) — skip gridPatternStyle and noiseOverlay
-- 2-3 animations total, not a stagger on every element
+## Code Budget
+Keep code under ~120 lines. React.createElement is verbose, so use these strategies:
+- Define helper functions for repeated elements (e.g. a card() function called N times instead of duplicating createElement blocks)
+- Combine style objects on one line with spread: { ...glassCard(theme, 16), padding: 32, ...fadeInUp(frame, 10) }
+- Store shared styles in variables at the top
 
 ## Rules
 1. Signature: \`function GeneratedComponent({ content, theme })\`
@@ -105,14 +104,23 @@ Your code MUST be under 80 lines. React.createElement is verbose, so keep your d
 4. Inline styles only. React.createElement() only (no JSX).
 5. useCurrentFrame() for animation. fps = 30.
 6. depthShadow() returns a STRING → use as boxShadow value
-7. Background helpers return STYLE OBJECTS → render as a div layer
+7. Background helpers return STYLE OBJECTS → render as separate div layers
 
-## Pattern (keep it this simple)
+## Visual Quality
+- Fill the FULL 1920×1080 frame. Use padding (80-100px) for breathing room.
+- Layer backgrounds: animatedMeshBg for the main bg, optionally gridPatternStyle as a second layer
+- Use staggered animations with increasing delays (e.g. fadeInUp at 5, 15, 25, 35)
+- Use glassSurface/glassCard for panels, depthShadow() for depth
+- Use gradientText or themedHeadlineStyle for headlines
+- Large readable typography via getTypography(theme)
+- Animate numbers with counterSpinUp — ALWAYS Math.round() or .toFixed()
+- typewriterReveal returns { visibleChars, showCursor } — slice text, never render the object
+
+## Example (shows the helper-function pattern)
 \`\`\`
 function GeneratedComponent({ content, theme }) {
   var frame = useCurrentFrame();
   var t = getTypography(theme);
-  // helper for repeated items
   function card(label, value, i) {
     return React.createElement('div', { key: i, style: { ...glassCard(theme, 16), padding: 32, ...fadeInUp(frame, 10 + i * 10) } },
       React.createElement('div', { style: { ...t.stat, color: theme.colors.primary } }, Math.round(counterSpinUp(frame, 15 + i * 10, value))),
@@ -121,33 +129,52 @@ function GeneratedComponent({ content, theme }) {
   }
   return React.createElement(AbsoluteFill, null,
     React.createElement('div', { style: animatedMeshBg(frame, theme) }),
+    React.createElement('div', { style: gridPatternStyle(theme) }),
     React.createElement('div', { style: { position:'relative', zIndex:1, width:'100%', height:'100%', display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', padding:80, gap:48 } },
       React.createElement('h1', { style: { ...t.heroTitle, ...themedHeadlineStyle(theme), ...fadeInBlur(frame, 0) } }, 'Your Title'),
+      React.createElement('p', { style: { ...t.body, color: theme.colors.textMuted, ...fadeInUp(frame, 10) } }, 'A subtitle or description goes here'),
       React.createElement('div', { style: { display:'flex', gap:32 } }, card('Users', 4200, 0), card('Revenue', 98, 1), card('Growth', 340, 2))
     )
   );
 }
 \`\`\`
+This is a MINIMAL example. You can add more content — sidebar layouts, image showcases, feature grids, etc. — as long as you use helper functions for repeated structures and stay under ~120 lines.
 
-## Key helpers (all in scope)
-- fadeInBlur(frame, delay), fadeInUp(frame, delay), scaleIn(frame, delay) → animation style objects
-- staggerEntrance(frame, index, baseDelay, spacing?) → auto-animated style
-- counterSpinUp(frame, delay, target) → RAW FLOAT. ALWAYS: Math.round(...) or .toFixed(1)
-- typewriterReveal(frame, delay, charCount) → OBJECT { visibleChars, showCursor }. Use: text.slice(0, tw.visibleChars). NEVER render the object directly.
-- animatedMeshBg(frame, theme) → background style object
-- glassSurface(theme), glassCard(theme, radius?) → frosted glass style
-- depthShadow() → boxShadow string
-- gradientText(from, to), themedHeadlineStyle(theme) → gradient text style
-- getTypography(theme) → { heroTitle, sectionTitle, cardTitle, body, caption, stat, label }
-- spacing → { scenePadding:80, cardGap:24, cardPadding:32, borderRadius:{ sm:10, md:16, lg:24 } }
-- Img component for images: React.createElement(Img, { src: url, style: { width:400, objectFit:'cover' } })
-- content.images → array of { name, url, width, height } (may be empty)
-- accentColor(theme, index?) → color string
-- theme.colors.{background, surface, primary, secondary, text, textMuted, accent}
-- theme.fonts.{heading, body}, theme.borderRadius
+## Available Helpers (all in scope)
+### Animation
+fadeInBlur(frame, delay, dur?), fadeInUp(frame, delay, distance?, dur?), scaleIn(frame, delay, dur?),
+slideFromLeft(frame, delay), slideFromRight(frame, delay), glowPulse(frame, delay, color),
+revealLine(frame, delay, dur?), staggerEntrance(frame, index, baseDelay, spacing?),
+floatY(frame, amplitude?, speed?, phase?), breathe(frame, speed?, amount?, phase?)
+
+### Numbers & Text
+counterSpinUp(frame, delay, target, dur?) → RAW FLOAT, always Math.round() or .toFixed()
+typewriterReveal(frame, delay, charCount, dur?) → { visibleChars, showCursor }. NEVER render the object directly.
+
+### Backgrounds (return style objects — render as div layers)
+animatedMeshBg(frame, theme), meshGradientStyle(theme), gridPatternStyle(theme),
+noiseOverlayStyle(), glowOrbStyle(frame, color, size, x, y, delay?),
+scanLineStyle(frame, delay, color, dur?), glowBorderStyle(frame, color, delay?)
+
+### Surfaces & Styles
+glassSurface(theme), glassCard(theme, radius?), depthShadow() → boxShadow string,
+gradientText(from, to), themedHeadlineStyle(theme), themedButtonStyle(theme),
+accentColor(theme, index?) → color string, isThemeDark(theme) → boolean
+
+### Typography & Layout
+getTypography(theme) → { heroTitle, sectionTitle, cardTitle, body, bodyLg, caption, stat, label }
+spacing → { scenePadding:80, scenePaddingX:100, cardGap:24, cardPadding:32, borderRadius:{ sm:10, md:16, lg:24, xl:32 } }
+
+### Images
+Img component: React.createElement(Img, { src: url, style: { width:400, objectFit:'cover' } })
+content.images → array of { name, url, width, height } (may be empty)
+
+### Theme
+theme.colors.{background, surface, primary, secondary, text, textMuted, accent}
+theme.fonts.{heading, body}, theme.borderRadius
 
 ## Workflow
-1. Call write_code with your COMPLETE component (one call, under 80 lines)
+1. Call write_code with your COMPLETE component (one call, ~120 lines max)
 2. Call finalize_component to validate
 3. If errors: call edit_code to fix, then finalize_component again (max 3 tries)
 4. If impossible: call report_error with explanation`;
@@ -398,7 +425,7 @@ ${projectDesignContext}${imageCatalog}
 **Component**: ${componentName}
 **Intent**: ${intent}
 
-Write a CONCISE component (under 80 lines). Use helper functions for repeated elements. One write_code call, then finalize_component.`;
+Write the component using helper functions for repeated structures. Keep it under ~120 lines. One write_code call, then finalize_component.`;
 
       const apiKey =
         process.env.SUBCONSCIOUS_API_KEY;
