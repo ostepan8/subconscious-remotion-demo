@@ -33,7 +33,7 @@ export const SYSTEM_PROMPT = `You are a creative director and video strategist e
 - **remove_scene**: Delete a scene.
 - **reorder_scenes**: Change the order of scenes.
 - **update_project**: Update project title, description, or theme.
-- **generate_voiceover_script**: Write a voiceover script for a scene or all scenes.
+- **generate_voiceover_script**: Write a voiceover script for a scene. Script MUST fit the scene duration — max words ≈ (durationInFrames ÷ 30) × 2.2. Too-long scripts are rejected. Call list_scenes first to know each scene's durationInFrames.
 - **generate_voiceover**: Kick off ElevenLabs audio generation for scenes that have voiceover scripts. Runs in the background — returns immediately so you can keep working. Audio appears in the timeline when ready. Choose a voice: Josh (friendly, default), George (warm British narrator), Rachel (female, warm), Antoni (professional), Arnold (authoritative).
 - **list_media**: View all uploaded media (images, videos, audio, components) available in the project. Filter by type if needed. For components, returns only names — use get_component_source to read implementation details.
 - **get_component_source**: Read the full source code of a React component by name or mediaId. Call this only for the specific components you want to showcase — avoids loading all source at once.
@@ -403,7 +403,7 @@ You are a TOOL-CALLING agent. Your job is to CALL TOOLS and BUILD scenes — not
 7. Pick the best archetype internally. **If the project has a GitHub repo, plan for 2-3 generated scenes** showing different parts of the product's UI (e.g. landing page, dashboard, key feature). Mix these with standard narrative scenes (hero, features, CTA) for a complete video.
 8. IMMEDIATELY start calling add_scene to create 4-6 scenes. For generated scenes, call add_scene first (type "generated", content with generationStatus "pending"), then call generate_component for each. **For non-generated scenes, include mediaUrl, mediaId, mediaWidth, mediaHeight in the content JSON for scenes that use media.** Use brand colors via styleOverrides on EVERY scene. Call the tools NOW.
 9. **If you created scenes without embedding media**, use set_scene_media to attach media items to the appropriate scenes now.
-10. After all scenes have media properly assigned, call generate_voiceover_script to write scripts for all scenes.
+10. After all scenes have media properly assigned, call **list_scenes** to get each scene's durationInFrames, then call generate_voiceover_script. Each script MUST be shorter than the scene allows: max words = (durationInFrames ÷ 30) × 2.2. For example, a 150-frame (5s) scene fits ~11 words, a 300-frame (10s) scene fits ~22 words. Scripts that exceed this limit will be REJECTED. Keep scripts punchy and conversational — every word counts.
 11. After writing all voiceover scripts, call **generate_voiceover** to kick off ElevenLabs audio generation for all scenes. Pick a voice that matches the brand tone (e.g. "George" for professional, "Josh" for casual). This runs in the background — do NOT wait for it.
 12. End with a 1-2 sentence summary like: "Built a 5-scene Product Tour with your screenshots and components. Voiceovers are generating — they'll appear in the timeline shortly!"
 
@@ -679,7 +679,7 @@ export function buildTools(
       type: "function" as const,
       name: "generate_voiceover_script",
       description:
-        "Write a voiceover script for a specific scene. Provide sceneId and script text (30-60 words, conversational, must flow as part of a cohesive narrative across all scenes).",
+        "Write a voiceover script for a specific scene. CRITICAL: script must be SHORT ENOUGH to fit the scene duration. Max words ≈ (durationInFrames / 30) × 2.2. Example: 150 frames (5s) = max 11 words, 300 frames (10s) = max 22 words. The server will REJECT scripts that are too long. Keep it conversational and part of a cohesive narrative.",
       url: `${convexSiteUrl}/tools/generate-voiceover-script${s}`,
       method: "POST" as const,
       timeout: 15,
@@ -688,7 +688,7 @@ export function buildTools(
         properties: {
           projectId: projectIdProp,
           sceneId: { type: "string" as const, description: "The scene to write a voiceover script for" },
-          script: { type: "string" as const, description: "The voiceover script text (30-60 words, flows as part of cohesive narrative)" },
+          script: { type: "string" as const, description: "The voiceover script text. MUST fit scene duration: max words = (durationInFrames / 30) × 2.2. Too-long scripts are rejected." },
           scripts: {
             type: "string" as const,
             description:

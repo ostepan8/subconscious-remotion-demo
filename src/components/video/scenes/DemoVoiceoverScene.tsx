@@ -14,6 +14,7 @@ import {
   scanLineStyle,
   breathe,
   typewriterReveal,
+  resolvePublicAsset,
 } from "./shared";
 
 const font = "Inter, system-ui, -apple-system, sans-serif";
@@ -158,7 +159,7 @@ export default function DemoVoiceoverScene({
           <div style={headerStyle}>
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
               <Img
-                src="/brand/Subconscious_Logo_Graphic.svg"
+                src={resolvePublicAsset("/brand/Subconscious_Logo_Graphic.svg")}
                 style={{ width: 24, height: 24 }}
               />
               <span

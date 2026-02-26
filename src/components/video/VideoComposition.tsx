@@ -7,6 +7,7 @@ import {
   interpolate,
 } from "remotion";
 import type { VideoTheme, SceneType, SceneContent } from "@/types";
+import { resolvePublicAsset } from "./scenes/shared";
 
 import HeroScene from "./scenes/HeroScene";
 import FeaturesScene from "./scenes/FeaturesScene";
@@ -194,7 +195,7 @@ export default function VideoComposition({
             </AbsoluteFill>
             {scene.voiceoverAudioUrl && (
               <Audio
-                src={scene.voiceoverAudioUrl}
+                src={resolvePublicAsset(scene.voiceoverAudioUrl)}
                 volume={1}
                 pauseWhenBuffering
               />
