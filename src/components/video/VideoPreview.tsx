@@ -1,6 +1,6 @@
 "use client";
 
-import { type ForwardedRef, forwardRef } from "react";
+import { type ForwardedRef, forwardRef, useMemo } from "react";
 import { Player, type PlayerRef } from "@remotion/player";
 import VideoComposition from "./VideoComposition";
 import type { SceneData } from "./VideoComposition";
@@ -28,6 +28,8 @@ const VideoPreview = forwardRef(function VideoPreview(
     1,
   );
 
+  const inputProps = useMemo(() => ({ scenes, theme }), [scenes, theme]);
+
   if (scenes.length === 0) {
     return (
       <div
@@ -52,7 +54,7 @@ const VideoPreview = forwardRef(function VideoPreview(
       <Player
         ref={ref}
         component={VideoComposition}
-        inputProps={{ scenes, theme }}
+        inputProps={inputProps}
         durationInFrames={totalDuration}
         compositionWidth={1920}
         compositionHeight={1080}

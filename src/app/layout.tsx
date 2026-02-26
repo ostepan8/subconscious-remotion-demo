@@ -18,7 +18,10 @@ export const metadata: Metadata = {
   title: "Subconscious Video Creator",
   description:
     "Create stunning promotional videos for your product with AI-powered scene generation, themes, and voiceover.",
-  icons: { icon: "/favicon.svg" },
+  icons: {
+    icon: "/favicon.svg",
+    apple: "/brand/Subconscious_Logo_Graphic.png",
+  },
 };
 
 export default function RootLayout({

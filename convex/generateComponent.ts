@@ -138,6 +138,7 @@ ${COMPONENT_API_REF}
    - Call edit_code to fix the specific issue (find the broken code, replace with correct code)
    - Call finalize_component again
    - Repeat until success=true or you've tried 3 times
+4. If you CANNOT complete the task (impossible request, exhausted retries, or unclear instructions), call report_error with a clear explanation so the user is notified immediately
 
 ## CRITICAL: typewriterReveal Example (MUST follow this pattern)
 \`\`\`
@@ -233,6 +234,32 @@ function buildSubagentTools(
           },
         },
         required: [] as string[],
+        additionalProperties: false,
+      },
+      defaults: { sceneId },
+    },
+    {
+      type: "function",
+      name: "report_error",
+      description:
+        "Call this when you CANNOT complete the task. Provide a clear error message. This notifies the user immediately instead of leaving them waiting.",
+      url: s("report-error"),
+      method: "POST",
+      timeout: 10,
+      parameters: {
+        type: "object",
+        properties: {
+          sceneId: {
+            type: "string",
+            description: "Scene ID",
+          },
+          errorMessage: {
+            type: "string",
+            description:
+              "A clear explanation of why the task cannot be completed",
+          },
+        },
+        required: ["errorMessage"],
         additionalProperties: false,
       },
       defaults: { sceneId },

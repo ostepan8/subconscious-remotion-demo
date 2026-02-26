@@ -19,6 +19,7 @@ ${COMPONENT_API_REFERENCE}
 3. Call edit_code for each change — use EXACT text from read_code as old_text
 4. Call finalize to validate your changes compile
 5. If finalize reports errors, call read_code again, then edit_code to fix, then finalize again
+6. If you CANNOT complete the request (e.g. the instruction is unclear, the task is impossible, or you've exhausted retries), call report_error with a clear explanation so the user is notified immediately
 
 ## Rules
 - Make the SMALLEST changes needed. Do NOT rewrite the entire file.
@@ -132,6 +133,29 @@ function buildEditorTools(
           sceneId: { type: "string" as const, description: "Scene ID" },
         },
         required: [] as string[],
+        additionalProperties: false,
+      },
+      defaults: { sceneId },
+    },
+    {
+      type: "function" as const,
+      name: "report_error",
+      description:
+        "Call this when you CANNOT complete the user's request. Provide a clear error message explaining why. This immediately notifies the user instead of leaving them waiting.",
+      url: `${convexSiteUrl}/tools/report-error${s}`,
+      method: "POST" as const,
+      timeout: 10,
+      parameters: {
+        type: "object" as const,
+        properties: {
+          sceneId: { type: "string" as const, description: "Scene ID" },
+          errorMessage: {
+            type: "string" as const,
+            description:
+              "A clear, user-facing explanation of why the task cannot be completed",
+          },
+        },
+        required: ["errorMessage"],
         additionalProperties: false,
       },
       defaults: { sceneId },
@@ -287,6 +311,20 @@ Start by calling read_code, then make your edits, then finalize.`;
                 code: finalCode,
                 explanation: `Applied ${editCount} edit${editCount !== 1 ? "s" : ""} successfully.`,
                 validated: true,
+              });
+              controller.enqueue(encoder.encode("data: [DONE]\n\n"));
+              controller.close();
+              return;
+            }
+
+            if (currentContent.generationStatus === "error") {
+              const errMsg =
+                typeof currentContent.generationError === "string"
+                  ? currentContent.generationError
+                  : "The agent encountered an error and could not complete the request.";
+              emit({
+                type: "error",
+                message: errMsg,
               });
               controller.enqueue(encoder.encode("data: [DONE]\n\n"));
               controller.close();

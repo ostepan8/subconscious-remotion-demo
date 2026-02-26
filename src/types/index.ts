@@ -61,7 +61,12 @@ export type SceneType =
   | "before-after"
   | "countdown"
   | "component-showcase"
-  | "generated";
+  | "generated"
+  | "demo-dashboard"
+  | "demo-editor"
+  | "demo-chat"
+  | "demo-theme-picker"
+  | "demo-voiceover";
 
 export type SceneLayout =
   | "centered"

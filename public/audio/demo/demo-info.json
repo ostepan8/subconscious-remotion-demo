@@ -1,0 +1,60 @@
+{
+  "scenes": [
+    {
+      "id": "hero",
+      "text": "Describe your product. Get a video. Subconscious turns your idea into a polished, multi-scene promotional video — with animations, themes, and AI voiceover — in under two minutes.",
+      "expectedDuration": 6,
+      "actualDuration": 10.579592,
+      "file": "demo-hero.mp3"
+    },
+    {
+      "id": "dashboard",
+      "text": "Your dashboard is your command center. See all your video projects at a glance, track their status, and spin up a new one with a single click.",
+      "expectedDuration": 6,
+      "actualDuration": 7.183673,
+      "file": "demo-dashboard.mp3"
+    },
+    {
+      "id": "editor",
+      "text": "The editor gives you total control. A live video preview updates in real time as our AI agent builds your scenes. Manage media, reorder your timeline, and chat with the agent — all in one place.",
+      "expectedDuration": 7,
+      "actualDuration": 11.72898,
+      "file": "demo-editor.mp3"
+    },
+    {
+      "id": "chat",
+      "text": "Just tell the agent what you want. Type a message — and watch it create custom scenes, apply your branding, and generate voiceover scripts on the fly.",
+      "expectedDuration": 7,
+      "actualDuration": 7.836735,
+      "file": "demo-chat.mp3"
+    },
+    {
+      "id": "theme-picker",
+      "text": "Choose from five stunning visual themes. Each one sets a complete design system — colors, fonts, animations, and personality — so your video looks professional from the start.",
+      "expectedDuration": 7,
+      "actualDuration": 9.221224,
+      "file": "demo-theme-picker.mp3"
+    },
+    {
+      "id": "voiceover",
+      "text": "Add a professional voiceover in seconds. The AI writes your script, you pick a voice, and ElevenLabs generates broadcast-quality narration for every scene.",
+      "expectedDuration": 7,
+      "actualDuration": 8.176327,
+      "file": "demo-voiceover.mp3"
+    },
+    {
+      "id": "stats",
+      "text": "Five curated themes. Over twenty-five scene types. From idea to finished video in under two minutes. Built for speed, designed for quality.",
+      "expectedDuration": 6,
+      "actualDuration": 8.620408,
+      "file": "demo-stats.mp3"
+    },
+    {
+      "id": "cta",
+      "text": "Ready to create your video? It takes less than a minute to get started. Try Subconscious — free.",
+      "expectedDuration": 6,
+      "actualDuration": 5.381224,
+      "file": "demo-cta.mp3"
+    }
+  ]
+}
