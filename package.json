@@ -20,6 +20,7 @@
     "@remotion/noise": "^4.0.428",
     "@remotion/player": "^4.0.428",
     "@remotion/transitions": "^4.0.428",
+    "@vercel/analytics": "^1.6.1",
     "convex": "^1.32.0",
     "image-size": "^2.0.2",
     "next": "16.1.6",
