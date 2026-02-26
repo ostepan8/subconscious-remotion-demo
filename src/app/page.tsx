@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useConvexAuth } from "convex/react";
 import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
@@ -16,8 +16,84 @@ const OnboardingWizard = dynamic(
   { ssr: false }
 );
 
+const SHOWCASE_VIDEOS = [
+  {
+    src: "/videos/receipt-agent-demo.mp4",
+    title: "Receipt Agent Demo",
+    description: "AI-powered receipt scanning and expense tracking",
+  },
+  {
+    src: "/videos/trigger-video.mp4",
+    title: "Trigger Automation",
+    description: "Workflow automation with intelligent triggers",
+  },
+  {
+    src: "/videos/subconscious-demo.mp4",
+    title: "Subconscious Platform",
+    description: "Build AI agents that work for you",
+  },
+];
+
+function VideoLightbox({
+  video,
+  onClose,
+}: {
+  video: (typeof SHOWCASE_VIDEOS)[number];
+  onClose: () => void;
+}) {
+  const videoRef = useRef<HTMLVideoElement>(null);
+
+  useEffect(() => {
+    document.body.style.overflow = "hidden";
+    return () => { document.body.style.overflow = ""; };
+  }, []);
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [onClose]);
+
+  return (
+    <div
+      className="fixed inset-0 z-[200] flex items-center justify-center"
+      style={{ background: "rgba(0,0,0,0.85)", backdropFilter: "blur(8px)" }}
+      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+    >
+      <button
+        onClick={onClose}
+        className="absolute top-5 right-5 text-white/60 hover:text-white transition-colors"
+        aria-label="Close"
+      >
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M18 6L6 18M6 6l12 12" />
+        </svg>
+      </button>
+
+      <div className="w-full max-w-4xl px-4">
+        <video
+          ref={videoRef}
+          src={video.src}
+          className="w-full rounded-2xl"
+          style={{ boxShadow: "0 20px 80px rgba(0,0,0,0.5)" }}
+          controls
+          autoPlay
+          playsInline
+        />
+        <div className="mt-4 text-center">
+          <h3 className="text-lg font-semibold text-white">{video.title}</h3>
+          <p className="text-sm text-white/50 mt-1">{video.description}</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function Home() {
   const [showWizard, setShowWizard] = useState(false);
+  const [activeVideo, setActiveVideo] = useState<(typeof SHOWCASE_VIDEOS)[number] | null>(null);
   const { isAuthenticated } = useConvexAuth();
   const router = useRouter();
 
@@ -58,26 +134,11 @@ export default function Home() {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              {[
-                {
-                  src: "/videos/receipt-agent-demo.mp4",
-                  title: "Receipt Agent Demo",
-                  description: "AI-powered receipt scanning and expense tracking",
-                },
-                {
-                  src: "/videos/trigger-video.mp4",
-                  title: "Trigger Automation",
-                  description: "Workflow automation with intelligent triggers",
-                },
-                {
-                  src: "/videos/subconscious-demo.mp4",
-                  title: "Subconscious Platform",
-                  description: "Build AI agents that work for you",
-                },
-              ].map((video) => (
-                <div
+              {SHOWCASE_VIDEOS.map((video) => (
+                <button
                   key={video.src}
-                  className="group rounded-2xl overflow-hidden border transition-all hover:border-[var(--brand-orange)]/30 hover:shadow-[0_8px_40px_rgba(255,92,40,0.08)]"
+                  onClick={() => setActiveVideo(video)}
+                  className="group rounded-2xl overflow-hidden border transition-all hover:border-[var(--brand-orange)]/30 hover:shadow-[0_8px_40px_rgba(255,92,40,0.08)] text-left cursor-pointer"
                   style={{
                     background: "var(--surface)",
                     borderColor: "var(--border)",
@@ -86,22 +147,17 @@ export default function Home() {
                   <div className="relative aspect-video bg-black">
                     <video
                       src={video.src}
-                      className="w-full h-full object-cover"
+                      className="w-full h-full object-cover pointer-events-none"
                       muted
-                      loop
                       playsInline
-                      onMouseEnter={(e) => e.currentTarget.play()}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.pause();
-                        e.currentTarget.currentTime = 0;
-                      }}
+                      preload="metadata"
                     />
-                    <div className="absolute inset-0 flex items-center justify-center opacity-60 group-hover:opacity-0 transition-opacity pointer-events-none">
+                    <div className="absolute inset-0 flex items-center justify-center opacity-60 group-hover:opacity-90 transition-opacity">
                       <div
-                        className="w-12 h-12 rounded-full flex items-center justify-center"
+                        className="w-14 h-14 rounded-full flex items-center justify-center transition-transform group-hover:scale-110"
                         style={{ background: "rgba(255,255,255,0.15)", backdropFilter: "blur(8px)" }}
                       >
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="white">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="white">
                           <path d="M8 5v14l11-7z" />
                         </svg>
                       </div>
@@ -121,7 +177,7 @@ export default function Home() {
                       {video.description}
                     </p>
                   </div>
-                </div>
+                </button>
               ))}
             </div>
           </div>
@@ -180,6 +236,10 @@ export default function Home() {
 
       {showWizard && (
         <OnboardingWizard onClose={() => setShowWizard(false)} />
+      )}
+
+      {activeVideo && (
+        <VideoLightbox video={activeVideo} onClose={() => setActiveVideo(null)} />
       )}
     </>
   );
