@@ -110,6 +110,13 @@ export default function VideoEditor({ project }: VideoEditorProps) {
   const [componentScanStatus, setComponentScanStatus] = useState("");
   const extractionTriggered = useRef(false);
 
+  const [exportState, setExportState] = useState<{
+    active: boolean;
+    status: string;
+    percent: number;
+    error: string | null;
+  }>({ active: false, status: "", percent: 0, error: null });
+
   const [dropStatus, setDropStatus] = useState<DropStatus>("idle");
   const [dropMessage, setDropMessage] = useState("");
   const dropCounter = useRef(0);
@@ -281,6 +288,78 @@ export default function VideoEditor({ project }: VideoEditorProps) {
     const frame = player.getCurrentFrame();
     player.seekTo(frame + delta);
   }, []);
+
+  const handleExport = useCallback(async () => {
+    if (exportState.active) return;
+    setExportState({ active: true, status: "Starting export...", percent: 0, error: null });
+
+    try {
+      const res = await fetch("/api/render", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ projectId: project.externalId }),
+      });
+
+      const reader = res.body?.getReader();
+      if (!reader) throw new Error("No response stream");
+
+      const decoder = new TextDecoder();
+      let buffer = "";
+      let downloadId = "";
+      let filename = "video.mp4";
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() || "";
+
+        for (const line of lines) {
+          if (!line.startsWith("data: ") || line === "data: [DONE]") continue;
+          try {
+            const event = JSON.parse(line.slice(6));
+            if (event.type === "status") {
+              setExportState((s) => ({ ...s, status: event.message }));
+            } else if (event.type === "progress") {
+              setExportState((s) => ({
+                ...s,
+                percent: event.percent,
+                status: `Rendering... ${event.percent}%`,
+              }));
+            } else if (event.type === "done") {
+              downloadId = event.downloadId;
+              filename = event.filename || "video.mp4";
+            } else if (event.type === "error") {
+              setExportState((s) => ({ ...s, error: event.message, status: "Export failed" }));
+            }
+          } catch {
+            /* skip parse errors */
+          }
+        }
+      }
+
+      if (downloadId) {
+        setExportState((s) => ({ ...s, status: "Downloading...", percent: 100 }));
+        const downloadUrl = `/api/render/download?id=${encodeURIComponent(downloadId)}&filename=${encodeURIComponent(filename)}`;
+        const a = document.createElement("a");
+        a.href = downloadUrl;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        setExportState({ active: false, status: "", percent: 0, error: null });
+      }
+    } catch (err) {
+      setExportState({
+        active: false,
+        status: "",
+        percent: 0,
+        error: err instanceof Error ? err.message : "Export failed",
+      });
+    }
+  }, [exportState.active, project.externalId]);
 
   const prefetchedRef = useRef<Map<string, () => void>>(new Map());
 
@@ -718,11 +797,39 @@ export default function VideoEditor({ project }: VideoEditorProps) {
                 {theme.name} theme
               </span>
             </div>
-            <div
-              className="text-xs px-2 py-0.5 rounded-full capitalize"
-              style={{ background: "rgba(62,208,195,0.1)", color: "var(--brand-teal)" }}
-            >
-              {project.status}
+            <div className="flex items-center gap-2">
+              <div
+                className="text-xs px-2 py-0.5 rounded-full capitalize"
+                style={{ background: "rgba(62,208,195,0.1)", color: "var(--brand-teal)" }}
+              >
+                {project.status}
+              </div>
+              <button
+                onClick={handleExport}
+                disabled={exportState.active || !scenes?.length}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all"
+                style={{
+                  background: exportState.active
+                    ? "rgba(255,92,40,0.15)"
+                    : "linear-gradient(135deg, #ff5c28, #e8501e)",
+                  color: exportState.active ? "var(--brand-orange)" : "#fff",
+                  opacity: !scenes?.length ? 0.4 : 1,
+                  cursor: exportState.active || !scenes?.length ? "not-allowed" : "pointer",
+                }}
+              >
+                {exportState.active ? (
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" style={{ animation: "dropSpin 1s linear infinite" }}>
+                    <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                  </svg>
+                ) : (
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                    <polyline points="7 10 12 15 17 10"/>
+                    <line x1="12" y1="15" x2="12" y2="3"/>
+                  </svg>
+                )}
+                {exportState.active ? "Exporting..." : "Export"}
+              </button>
             </div>
           </div>
 
@@ -949,6 +1056,99 @@ export default function VideoEditor({ project }: VideoEditorProps) {
           }}
           onClose={() => setSplittingScene(null)}
         />
+      )}
+
+      {/* Export progress overlay */}
+      {(exportState.active || exportState.error) && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 100,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            background: "rgba(0,0,0,0.7)",
+            backdropFilter: "blur(8px)",
+          }}
+        >
+          <div
+            style={{
+              background: "var(--surface, #1a2430)",
+              border: "1px solid var(--border, #2a3440)",
+              borderRadius: 16,
+              padding: "32px 40px",
+              minWidth: 360,
+              textAlign: "center",
+            }}
+          >
+            {exportState.error ? (
+              <>
+                <div style={{ fontSize: 40, marginBottom: 16 }}>
+                  <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#e85d3a" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ margin: "0 auto" }}>
+                    <circle cx="12" cy="12" r="10"/>
+                    <line x1="15" y1="9" x2="9" y2="15"/>
+                    <line x1="9" y1="9" x2="15" y2="15"/>
+                  </svg>
+                </div>
+                <div style={{ fontSize: 15, fontWeight: 600, color: "#e85d3a", marginBottom: 8 }}>
+                  Export Failed
+                </div>
+                <div style={{ fontSize: 13, color: "var(--muted, #8a9a9e)", marginBottom: 20 }}>
+                  {exportState.error}
+                </div>
+                <button
+                  onClick={() => setExportState({ active: false, status: "", percent: 0, error: null })}
+                  style={{
+                    padding: "8px 24px",
+                    borderRadius: 8,
+                    border: "1px solid var(--border, #2a3440)",
+                    background: "transparent",
+                    color: "var(--foreground, #f0f3ef)",
+                    fontSize: 13,
+                    fontWeight: 500,
+                    cursor: "pointer",
+                  }}
+                >
+                  Close
+                </button>
+              </>
+            ) : (
+              <>
+                <div style={{ marginBottom: 20 }}>
+                  <svg width="40" height="40" viewBox="0 0 24 24" fill="none" style={{ margin: "0 auto", animation: "dropSpin 1.5s linear infinite" }}>
+                    <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" stroke="var(--brand-orange, #ff5c28)" strokeWidth="2" strokeLinecap="round"/>
+                  </svg>
+                </div>
+                <div style={{ fontSize: 15, fontWeight: 600, color: "var(--foreground, #f0f3ef)", marginBottom: 6 }}>
+                  {exportState.status}
+                </div>
+                <div style={{ fontSize: 12, color: "var(--muted, #8a9a9e)", marginBottom: 20 }}>
+                  This may take a few minutes depending on video length
+                </div>
+                <div
+                  style={{
+                    width: "100%",
+                    height: 6,
+                    borderRadius: 3,
+                    background: "rgba(255,255,255,0.08)",
+                    overflow: "hidden",
+                  }}
+                >
+                  <div
+                    style={{
+                      height: "100%",
+                      borderRadius: 3,
+                      background: "linear-gradient(90deg, #ff5c28, #e8501e)",
+                      width: `${exportState.percent}%`,
+                      transition: "width 0.3s ease-out",
+                    }}
+                  />
+                </div>
+              </>
+            )}
+          </div>
+        </div>
       )}
 
     </div>
