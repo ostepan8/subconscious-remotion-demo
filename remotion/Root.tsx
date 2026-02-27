@@ -157,6 +157,9 @@ export const RemotionRoot: React.FC = () => {
         scenes: demoScenes,
         theme: brandTheme,
       }}
+      calculateMetadata={async ({ props }) => ({
+        durationInFrames: getTotalDuration(props.scenes),
+      })}
     />
   );
 };
